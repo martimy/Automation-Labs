@@ -1,6 +1,6 @@
 #!/bin/bash
-# nc-wrapper.sh
-# Usage: ./nc-wrapper.sh <host> [netconf-console2 options...]
+# nc_wrapper.sh
+# Usage: ./nc_wrapper.sh <host> [netconf-console2 options...]
 
 # ─── Credential Store ─────────────────────────────────────────────────────────
 # Format: HOST|PORT|USERNAME|PASSWORD
