@@ -1,0 +1,16 @@
+bcrypt==5.0.0
+cffi==2.1.1
+cryptography==50.0.0
+dictdiffer==0.10.0
+grpcio==1.83.0
+invoke==3.0.3
+lxml==6.1.1
+ncclient==0.7.1
+paramiko==5.0.0
+protobuf==7.35.1
+pyaml==26.7.0
+pycparser==3.0
+pygnmi==0.8.15
+PyNaCl==1.6.2
+PyYAML==6.0.3
+typing_extensions==4.16.0
