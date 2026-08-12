@@ -44,8 +44,8 @@ By the end of this lab, you will be able to:
 
 1. Navigate the Linux filesystem and establish a multi-module project hierarchy.
 2. Manage file ownership and permissions for automation scripts.
-3. Use text processing tools like grep and sed to manipulate configuration data.
-4. Manage systemd services through their full lifecycle.
+3. Use text processing tools like `grep` and `sed` to manipulate configuration data.
+4. Manage `systemd` services through their full lifecycle.
 5. Configure isolated network environments using namespaces, veth pairs, and static routing.
 6. Initialize a centralized Python virtual environment and a global Git repository.
 7. Implement a professional Git workflow including branching, merge conflict resolution, and pull requests.
@@ -54,11 +54,11 @@ By the end of this lab, you will be able to:
 
 You will need:
 
-- Your assigned Ubuntu VM IP address provided in Brightspace
-- A GitHub account
-- The GitHub Classroom assignment link, provided by an email from the instructor
+- Your assigned Ubuntu VM IP address provided in Brightspace: ________________.
+- A GitHub account.
+- The GitHub Classroom assignment link, provided by an email from the instructor.
 
-If any of the components above are missing when you get to that step, check with your lab instructor before starting the lab.
+If any of the components above are missing, check with your lab instructor before starting the lab.
 
 Throughout this document, commands you type are shown in code blocks. Where a command needs elevated privileges it is shown with `sudo`. If a step does not show `sudo`, you should not need it.
 
@@ -68,7 +68,7 @@ Throughout this document, commands you type are shown in code blocks. Where a co
 
 ## Task 0: Connecting to Your Lab VM
 
-1. Use an SSH client to log in to your assigned VM using the provided credentials. Possible SSH clients include: Command Prompt, PuTTY, or MobaXTerm on Windows, or the built in Terminal app on macOS and Linux. Start the terminal (next we assume Windows CMD), and use SSH to login in to the assigned VM:
+1. Use an SSH client to log in to your assigned VM using the provided credentials. Possible SSH clients include: Command Prompt, PuTTY, or MobaXTerm on Windows, or the built in Terminal app on macOS and Linux. Start the terminal, and use SSH to login in to the assigned VM:
 
     ```bash
     ssh student@<VM IP Address>
@@ -95,19 +95,19 @@ Throughout this document, commands you type are shown in code blocks. Where a co
 
 Objective: Establish a root level directory that will serve as the single source of truth for the entire course.
 
-1. Create a root directory named labs in your home folder.
+1. Create a root directory named `labs` in your home folder.
 
     ```bash
-    mkdir ~/clab
+    mkdir ~/labs
     ```
 
 2. Within this root, you will create a subfolder structure that separates lab assignments from shared utilities and network definitions.
 
     ```bash
-    mkdir -p ~/labs/lab1/scripts ~/labs/tools ~/labs/topology.
+    mkdir -p ~/labs/lab1/scripts ~/labs/tools ~/labs/topology
     ```
 
-    The lab1 directory will hold your specific deliverables for this module, the tools directory will house shared utilities like device libraries used across all labs, and the topology directory will store your persistent network definitions starting in Lab 2.
+    The `lab1` directory will hold your specific deliverables for this module, the tools directory will house shared utilities like device libraries used across all labs, and the topology directory will store your persistent network definitions starting in Lab 2.
 
 3. Practice moving between these directories using `cd` and confirming your location with `pwd`.
 
@@ -140,10 +140,10 @@ Objective: Establish a root level directory that will serve as the single source
 
 Objective: Use Linux utilities to extract and modify data within configuration files.
 
-1. Navigate to ~/labs/lab1 and create a file named `sample-config.txt` containing several interface and IP address lines (do not cut-paste the last EOF).
+1. Navigate to `~/labs/lab1` and create a file named `sample-config.txt` containing several interface and IP address lines (do not cut-paste the last EOF).
 
     ```bash
-    cat > lab1/sample-config.txt << 'EOF'
+    cat > sample-config.txt << 'EOF'
     hostname R1
     interface GigabitEthernet0/0
     description Uplink to Core
@@ -163,27 +163,27 @@ Objective: Use Linux utilities to extract and modify data within configuration f
 2. View the whole file.
 
     ```bash
-    cat lab1/sample-config.txt
+    cat sample-config.txt
     ```
 
 3. Use grep to filter for specific interface configuration blocks.
 
     ```bash
-    grep "interface" lab1/sample-config.txt
+    grep "interface" sample-config.txt
     ```
 
 4. Use a pipe to send grep output into `cut` to extract only the IP addresses from the file.
 
     ```bash
-    grep "ip address" lab1/sample-config.txt | cut -d ' ' -f 3
+    grep "ip address" sample-config.txt | cut -d ' ' -f 3
     ```
 
 5. Use `sed` to perform a search and replace operation, such as changing a VLAN ID, and apply the change permanently using the `-i` flag.
 
     ```bash
-    cat lab1/sample-config.txt
-    sed -i 's/VLAN10/VLAN30/' lab1/sample-config.txt
-    cat lab1/sample-config.txt
+    cat sample-config.txt
+    sed -i 's/VLAN10/VLAN30/' sample-config.txt
+    cat sample-config.txt
     ```
 
 ### Questions and Deliverables 
@@ -215,7 +215,7 @@ Objective: control a service through its full lifecycle without affecting the SS
     WantedBy=multi-user.target
     ```
 
-2. Reload the `systemd` daemon to pick up the new configuration:
+2. Save the file. Reload the `systemd` daemon to pick up the new configuration:
 
     ```bash
     sudo systemctl daemon-reload
@@ -230,7 +230,7 @@ Objective: control a service through its full lifecycle without affecting the SS
 4. Enable the service so it automatically starts when the VM boots: 
 
     ```bash
-    sudo systemctl enable inwk-demo`
+    sudo systemctl enable inwk-demo
     ```
 
 5. Practice stopping the service and observing the difference between an inactive status and a failed state.
@@ -370,7 +370,7 @@ Objective: extend Task 5 into a three namespace topology consisting of two hosts
 
 Target topology:
 ```text
-`ns-hostA` (10.10.1.2/24) $\leftrightarrow$ `ns-router` $\leftrightarrow$ `ns-hostB` (10.10.2.2/24).
+`ns-hostA` (10.10.1.2/24) -- `ns-router` -- `ns-hostB` (10.10.2.2/24).
 ```
 
 1. Clean up the namespaces from the previous task, then create three fresh ones.
@@ -420,7 +420,7 @@ Target topology:
 
     ```bash
     for ns in ns-hostA ns-router ns-hostB; do
-    sudo ip netns exec $ns ip link set lo up
+      sudo ip netns exec $ns ip link set lo up
     done
     sudo ip netns exec ns-hostA ip link set veth-a up
     sudo ip netns exec ns-router ip link set veth-r1 up
@@ -442,20 +442,14 @@ Target topology:
     sudo ip netns exec ns-router sysctl -w net.ipv4.ip_forward=1
     ```
 
-8. Verify forwarding is enabled by checking that `net.ipv4.ip_forward` equals 1.
-
-    ```bash
-    sudo ip netns exec ns-router sysctl net.ipv4.ip_forward
-    ```
-
-9. Add static routes on the hosts.
+8. Add static routes on the hosts.
 
     ```bash
     sudo ip netns exec ns-hostA ip route add 10.10.2.0/24 via 10.10.1.1
     sudo ip netns exec ns-hostB ip route add 10.10.1.0/24 via 10.10.2.1
     ```
 
-10. Test end to end connectivity by pinging from `ns-hostA` to `ns-hostB`.
+9. Test end to end connectivity by pinging from `ns-hostA` to `ns-hostB`.
 
 
     ```bash
@@ -464,20 +458,14 @@ Target topology:
 
 ### Questions and Deliverables
 
-1. Provide the output of the forwarding verification command from step 8, and the output of the ping test in step 10.
-2. In your own words, explain what would have happened in step 10 if IP forwarding had not been enabled on `ns-router`, even though the static routes on `ns-hostA` and `ns-hostB` were both correctly configured.
+1. Provide the output of the forwarding verification command from step 8, and the output of the ping test in step 9.
+2. In your own words, explain what would have happened in step 9 if IP forwarding had not been enabled on `ns-router`, even though the static routes on `ns-hostA` and `ns-hostB` were both correctly configured.
 
 ## Task 7: Automating Infrastructure with Bash
 
 Objective: turn the manual steps from Task 6 into repeatable scripts to avoid manual operational pitfalls.
 
-1. Create the  navigate to `~/labs/lab1/scripts`.
-
-    ```bash
-    mkdir -p ~/labs/lab1/scripts
-    cd ~/labs/lab1/scripts
-    ```
-
+1. Navigate to `~/labs/lab1/scripts`.
 2. Create a script named `build-topology.sh`. Use the logic from Task 6 to automate the creation of namespaces, `veth` pairs, IP assignments, and routing.
 
     ```bash
@@ -497,12 +485,12 @@ Objective: turn the manual steps from Task 6 into repeatable scripts to avoid ma
     NAMESPACES=("ns-hostA" "ns-router" "ns-hostB")
 
     for ns in "${NAMESPACES[@]}"; do
-    if ip netns list | grep -q "^$ns"; then
-        echo "$ns already exists, skipping"
-    else
-        ip netns add "$ns"
-        echo "Created $ns"
-    fi
+        if ip netns list | grep -q "$ns"; then
+            echo "$ns already exists, skipping"
+        else
+            ip netns add "$ns"
+            echo "Created $ns"
+        fi
     done
 
     # TODO: create the veth pairs and move each end into the right namespace
@@ -527,12 +515,12 @@ Objective: turn the manual steps from Task 6 into repeatable scripts to avoid ma
     NAMESPACES=("ns-hostA" "ns-router" "ns-hostB")
 
     for ns in "${NAMESPACES[@]}"; do
-    if ip netns list | grep -q "^$ns"; then
-        ip netns del "$ns"
-        echo "Deleted $ns"
-    else
-        echo "$ns does not exist, skipping"
-    fi
+        if ip netns list | grep -q "$ns"; then
+            ip netns del "$ns"
+            echo "Deleted $ns"
+        else
+            echo "$ns does not exist, skipping"
+        fi
     done
     ```
 
@@ -546,8 +534,8 @@ Objective: turn the manual steps from Task 6 into repeatable scripts to avoid ma
 6. Run `teardown-topology.sh` to clean your environment, then run `build-topology.sh` and verify connectivity with a ping.
 
     ```bash
-    sudo teardown-topology.sh
-    sudo build-topology.sh
+    sudo ./teardown-topology.sh
+    sudo ./build-topology.sh
     ```
 
 ### Questions and Deliverables
@@ -568,9 +556,10 @@ Objective: establish the root of your project as a Git repository and set up a u
     cd ~/labs
     ```
 
-2. Initialize the repository.
+2. Initialize the repository and set the main branch name.
     ```bash
     git init
+    git branch -m main
     ```
 
 3. Configure your Git identity. Use your own name and email address.
@@ -581,9 +570,10 @@ Objective: establish the root of your project as a Git repository and set up a u
     ```
 
 4. Create a global `.gitignore` file in `~/labs`. This file must proactively exclude the following to keep your repository clean:
-    
+
+    ```bash
     cat > .gitignore << 'EOF'
-    .venv/                # your Python virtual environment
+    .velab/                # your Python virtual environment
     clab-*/               # directories auto-generated by Containerlab
     __pycache__/          # Python bytecode
     .env                  # sensitive token files used in later labs
@@ -612,7 +602,7 @@ Objective: establish the root of your project as a Git repository and set up a u
 
 Objective: bring your Part A work under version control and practice the basic Git lifecycle.
 
-1. Run `git status` and observe that your `lab1`, `tools`, and `topology` folders are listed as untracked, while `.velab` is not showing.
+1. Run `git status` and observe that your `lab1`, `.gitignore`, and `requirements.txt` are listed as untracked, while `.velab` is not showing.
 
     ```bash
     git status
@@ -621,7 +611,7 @@ Objective: bring your Part A work under version control and practice the basic G
 2. Stage your work for the first commit.
 
     ```bash
-    git add lab1/ tools/ topology/ .gitignore requirements.txt
+    git add lab1/ .gitignore requirements.txt
     ```
 
 3. Verify the change in status. The files should now be listed as changes to be committed.
@@ -647,6 +637,7 @@ Objective: bring your Part A work under version control and practice the basic G
 Objective: isolate infrastructure changes on a feature branch before merging them into the main line of development.
 
 1. Create and switch to a feature branch named `feature/add-hostC` in one step and verify.
+
     ```bash
     git switch -c feature/add-hostC
     git branch
@@ -664,22 +655,22 @@ Objective: isolate infrastructure changes on a feature branch before merging the
 4. Stage and commit your changes on the feature branch.
 
     ```bash
-    git add scripts/build-topology.sh scripts/teardown-topology.sh
-    git commit -m "Add ns-hostC to the topology"`
+    git add lab1/scripts/build-topology.sh lab1/scripts/teardown-topology.sh
+    git commit -m "Add ns-hostC to the topology"
     ```
 
-5. Switch back to the `master` branch
+5. Switch back to the `main` branch
     ```bash
-    git switch master
+    git switch main
     ```
 
-6. Confirm that the changes for `ns-hostC` are not present in your scripts while on `master`, demonstrating branch isolation.
+6. Confirm that the changes for `ns-hostC` are not present in your scripts while on `main`, demonstrating branch isolation.
 
     ```bash
-    cat scripts/build-topology.sh
+    cat lab1/scripts/build-topology.sh
     ```
 
-8. Merge the feature branch into `master`. Since `master` has not changed, this will be a fast forward merge.
+8. Merge the feature branch into `main`. Since `main` has not changed, this will be a fast forward merge.
 
     ```bash
     git merge feature/add-hostC
@@ -688,63 +679,71 @@ Objective: isolate infrastructure changes on a feature branch before merging the
 ### Questions and Deliverables
 
 1. Provide the output of git branch from step 1, confirming which branch was active.
-2. In step 5, `cat scripts/build-topology.sh` on master should not show `ns-hostC` yet. Provide that output, and explain in one sentence why the change is not visible there.
+2. In step 5, `cat scripts/build-topology.sh` on main should not show `ns-hostC` yet. Provide that output, and explain in one sentence why the change is not visible there.
 
 ## Task 11: Simulating and Resolving a Merge Conflict
 
 Objective: resolve a conflict manually when two different branches modify the same configuration lines in the same file.
 
-1. Ensure you are on the `master` branch, then create a branch named `experiment-a`: 
+1. Ensure you are on the `main` branch, then create a branch named `experiment-a`: 
     ```bash
-    git switch master
-    git switch -c experiment-a`
+    git switch main
+    git switch -c experiment-a
     ```
-2. In `~/labs/lab1/scripts/build-topology.sh`, change the subnet used for `ns-hostA` from `10.10.1.0/24` to `10.10.11.0/24`. Commit this change.
+2. In `~/labs/lab1/scripts/build-topology.sh`, change the subnet used for `ns-hostA` from `10.10.1.0/24` to `10.10.11.0/24`.
 
     ```bash
-    git add scripts/build-topology.sh
+    nano ~/labs/lab1/scripts/build-topology.sh
+    ```
+
+3. Commit this change.
+
+    ```bash
+    git add lab1/scripts/build-topology.sh
     git commit -m "Renumber ns-hostA subnet to 10.10.11.0/24"
     ```
 
-3. Return to `master` and create a second branch named `experiment-b`.
+4. Return to `main` and create a second branch named `experiment-b`.
+
     ```bash
-    git switch master
-    git switch -c experiment-b`
+    git switch main
+    git switch -c experiment-b
     ```
 
-4. In the same script, change the same `ns-hostA` subnet lines, but use `10.10.21.0/24` instead. Commit this change.
+5. Repeate step 2, but use `10.10.21.0/24` instead. Commit this change.
+
     ```bash
-    git add scripts/build-topology.sh
+    git add lab1/scripts/build-topology.sh
     git commit -m "Renumber ns-hostA subnet to 10.10.21.0/24"
     ```
-5. Return to `master` and merge `experiment-a`. This merge should be clean.
+6. Return to `main` and merge `experiment-a`. This merge should be clean.
 
     ```bash
-    git switch master
+    git switch main
     git merge experiment-a
     ```
 
-6. Attempt to merge `experiment-b` into `master`. Git will report a merge conflict because both branches modified the same lines.
+7. Attempt to merge `experiment-b` into `main`. Git will report a merge conflict because both branches modified the same lines.
 
     ```bash
     git merge experiment-b
     ```
 
-7. Open `build-topology.sh` and look for the conflict markers: `<<<<<<<`, `=======`, and `>>>>>>>`. Manually edit the file to keep the `10.10.21.0/24` subnet and remove all conflict markers.
-8. Stage the resolved file and complete the merge commit.
+8. Open `lab1/scripts/build-topology.sh` and look for the conflict markers: `<<<<<<<`, `=======`, and `>>>>>>>`. Manually edit the file to keep the `10.10.21.0/24` subnet and remove all conflict markers.
+9. Stage the resolved file and complete the merge commit.
 
     ```bash
-    git add scripts/build-topology.sh
+    git add lab1/scripts/build-topology.sh
     git commit
     ```
 
-9. Confirm the topology still works after resolving the conflict.
+10. Confirm the topology still works after resolving the conflict.
 
     ```bash
-    sudo ~/labs/lab1/scripts/teardown-topology.sh
-    sudo ~/labs/lab1/scripts/build-topology.sh
+    sudo ./lab1/scripts/teardown-topology.sh
+    sudo ./lab1/scripts/build-topology.sh
     ```
-10. Visualize the branch and merge history.
+11. Visualize the branch and merge history.
 
     ```bash
     git log --graph --oneline --all
@@ -760,14 +759,14 @@ Objective: connect your local repository to GitHub Classroom and complete a peer
 3. Link your local `~/labs` repository to the new remote.
 
     ```bash
+    cd ~/labs
     git remote add origin <your-classroom-repo-url>
- 
     ```
 
-4. Push your local `master` branch to GitHub.
+4. Push your local `main` branch to GitHub.
 
     ```bash
-    git push -u origin master
+    git push -u origin main
     ```
 
 5. Create a new branch named `docs/readme` for project documentation.
@@ -777,7 +776,7 @@ Objective: connect your local repository to GitHub Classroom and complete a peer
     git switch -c docs/readme
     ```
 
-6. Create a `~/labs/README.md` file at the root. Describe the contents of the `lab1`, `tools`, and `topology` directories, and explain how to run the topology scripts.
+6. Create a `~/labs/README.md` file at the root. Describe the contents of the `lab1`, directories, and explain how to run the topology scripts.
 
 
     ```bash
@@ -788,19 +787,20 @@ Objective: connect your local repository to GitHub Classroom and complete a peer
 
     ```bash
     git add README.md
-    git commit -m "Add README describing the lab topology and scripts"
+    git commit -m "Add README describing lab1 folder content"
     git push -u origin docs/readme
     ```
-8. On the GitHub website, open a pull request from `docs/readme` into `master`.
+
+8. On the GitHub website, open a pull request from `docs/readme` into `main`.
 9. Review your own pull request by adding at least one inline comment on the diff to highlight a specific implementation detail.
 10. Merge the pull request using the GitHub web interface.
-11. Return to your local terminal, switch to `master`, and pull the merged changes: `git pull`.
-
+11. Return to your local terminal, switch to `main`, and pull the merged changes: `git pull`.
 
     ```bash
-    git switch master
+    git switch main
     git pull
     ```
+
 ### Questions and Deliverables
 
 1. Provide the URL of your merged pull request.
@@ -824,7 +824,7 @@ Part B: Git and Environment Management
 1. Compare the `git status` output in Task 8 before you staged your files with the output after staging. Which files moved from untracked to staged?
 2. Provide the output of `git log --oneline` from Task 9.
 3. In Task 9, compare the effect of `git restore <file>` with `git restore --staged <file>`. If you accidentally staged a file but wanted to keep your local edits, which command would you use?
-4. Provide the output of `git branch` from Task 10, and explain in one sentence why the `ns-hostC` changes were not visible when you switched back to the `master` branch.
+4. Provide the output of `git branch` from Task 10, and explain in one sentence why the `ns-hostC` changes were not visible when you switched back to the `main` branch.
 5. Provide the content of your `REFLECTION.md` file from Task 11.
 6. Provide the URL of your merged pull request from Task 12.
 7. Why does GitHub require a personal access token instead of your account password for Git operations over HTTPS?
@@ -833,7 +833,7 @@ Part B: Git and Environment Management
 
 You should leave the `inwk-demo` systemd service running as it is a harmless background process. You may leave your namespace topology active or use your `teardown-topology.sh` script to remove it, as the scripts allow you to rebuild the infrastructure at any time.
 
-Do not delete the `.venv` directory or your `.gitignore` file, as these are central to the unified environment you will use for the rest of the course. Do not delete your GitHub Classroom repository, as you will continue to extend this same repository in Lab 2 and beyond.
+Do not delete the `.velab` directory or your `.gitignore` file, as these are central to the unified environment you will use for the rest of the course. Do not delete your GitHub Classroom repository, as you will continue to extend this same repository in Lab 2 and beyond.
 
 # Submission
 
@@ -841,7 +841,7 @@ Before submitting, verify that your repository history includes the following de
 
 1. The initial commit containing `build-topology.sh`, `teardown-topology.sh`, and `sample-config.txt`.
 2. The root level `.gitignore` and `requirements.txt` files.
-3. The `feature/add-host-c` merge.
+3. The `feature/add-hostC` merge.
 4. The resolved merge conflict from Task 11, visible as a merge commit in the git graph.
 5. The `REFLECTION.md` file in the `lab1` folder.
 6. The `docs/readme` pull request, merged and visible on your GitHub Classroom repository.
