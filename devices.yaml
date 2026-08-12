@@ -1,0 +1,43 @@
+devices:
+  srl1:
+    netconf:
+      host: srl1
+      port: 830
+      username: admin
+      password: NokiaSrl1!
+      hostkey_verify: false
+    gnmi:
+      target:
+        - srl1
+        - 57400
+      username: admin
+      password: NokiaSrl1!
+      skip_verify: true
+  ceos1:
+    netconf:
+      host: ceos1
+      port: 830
+      username: admin
+      password: admin
+      hostkey_verify: false
+    gnmi:
+      target:
+        - ceos1
+        - 6030
+      username: admin
+      password: admin
+      insecure: true
+  ceos1:
+    netconf:
+      host: ceos1
+      port: 830
+      username: admin
+      password: admin
+      hostkey_verify: false
+    gnmi:
+      target:
+        - ceos1
+        - 6030
+      username: admin
+      password: admin
+      insecure: true
