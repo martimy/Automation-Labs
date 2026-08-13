@@ -30,7 +30,7 @@ By the end of this lab, you will be able to:
 2. Explain the components of a Containerlab topology definition file, including kinds, nodes, images, and links
 3. Deploy a multi vendor topology combining Arista cEOS and Nokia SR Linux nodes
 4. Manually configure Layer 3 interfaces on both Arista EOS and Nokia SR Linux, and confirm reachability across a fully meshed topology
-5. Create and use an isolated Python virtual environment to manage a project's dependencies
+5. Utilize the centralized Python virtual environment established in Lab 1 to manage project dependencies
 6. Use Netmiko to connect to a network device over SSH and retrieve CLI output
 7. Parse unstructured CLI output using a regular expression with named groups
 8. Design and raise a custom exception class so a multi device script can report a connection failure without crashing
@@ -142,7 +142,7 @@ Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy
     sudo docker exec -it clab-test-ceos-ceos1 Cli
     ```
 
-    You can also login via SSH using default username/password=`admin/admin` (recommnded):
+    You can also login via SSH using default username/password=`admin/admin` (recommended):
 
     ```bash
     ssh admin@clab-test-ceos-ceos1
@@ -401,7 +401,7 @@ Configure each node fully, and verify it, before moving to the next one. A typo 
     quit
     ```
 
-    If commit is not sucessful, enter `discard stay` and repeat steps 5 to 7.
+    If commit is not successful, enter `discard stay` and repeat steps 5 to 7.
 
 
 ### Questions and Deliverables
@@ -446,7 +446,7 @@ Objective: confirm every node can reach both of its neighbors directly.
 
 ## Task 6: Building an Isolated Python Environment
 
-Objective: create a project specific virtual environment before installing anything, so this project's dependencies stay separate from the rest of the VM.
+Objective: Activate the virtual environment and update the global dependencies.
 
 1. Move into your lab2 folder.
 
@@ -454,14 +454,13 @@ Objective: create a project specific virtual environment before installing anyth
     cd ~/labs/lab2
     ```
 
-2. Create and activate a virtual environment.
+2. Activate the virtual environment created in Lab 1.
 
     ```bash
-    python3 -m venv .velab2
-    source .velab2/bin/activate
+    source ~/labs/.velab/bin/activate
     ```
 
-    Your prompt should now be prefixed with (.velab2).
+    Your prompt should now be prefixed with (.velab).
 
 3. Install Netmiko inside the environment.
 
@@ -469,17 +468,16 @@ Objective: create a project specific virtual environment before installing anyth
     pip install netmiko
     ```
 
-4. Freeze the installed dependencies to a file, so this environment is reproducible.
+4. Update the cumulative requirements file at the root of your repository.
 
     ```bash
-    pip freeze > requirements.txt
-    cat requirements.txt
+    pip freeze > ~/labs/requirements.txt
     ```
 
 ### Questions and Deliverables
 
-1. Provide the contents of requirements.txt.
-2. If a classmate cloned your repository onto their own VM and created a fresh virtual environment, what single pip command would recreate your exact environment from `requirements.txt`?
+1. Provide the updated contents of `~/labs/requirements.txt`.
+2. If a classmate cloned your repository onto their own VM and created a fresh virtual environment, what single pip command would recreate the entire course environment from the root `requirements.txt`?
 
 ## Task 7: Your First Netmiko Connection
 
@@ -630,7 +628,7 @@ Objective: extend the script to loop over both cEOS nodes, and make sure one unr
 
 ## Task 10: Committing Your Work
 
-Objective: bring the new topology file and scripts into your existing repository from Lab 1, continuing the same repository rather than starting a new one.
+Objective: Stage your changes using the global Git configuration established in Lab 1.
 
 1. Move to the root of your repository.
 
@@ -639,21 +637,20 @@ Objective: bring the new topology file and scripts into your existing repository
     git status
     ```
 
-2. Make sure your virtual environment and the configuration directory created by containerlab are not committed, only requirements.txt should be tracked.
+2. Verify that the global `.gitignore` created in Lab 1 is correctly excluding the `.velab/` directory and `clab-` artifacts.
 
     ```bash
-    echo "lab2/.velab2/" >> .gitignore
-    echo "lab2/topology/clab-lab2-ring" >> .gitignore
+    echo "lab2/topology/clab-" >> .gitignore
     ```
 
-3. Stage everything and confirm what is about to be committed.
+3. Stage your `lab2` directory and the updated `requirements.txt` and `.gitignore`.
 
     ```bash
-    git add lab2 .gitignore
+    git add lab2 requirements.txt .gitignore
     git status
     ```
 
-    Confirm `.velab2` and `clab-lab2-ring` do not appear anywhere in this output, only the topology file, scripts, requirements.txt, and the .gitignore change should be listed.
+    Confirm that no environment folders or temporary `Containerlab` files are being tracked.
     
     Note: `git add` command is likely to produce a warning about adding embedded git repository if `lab2/topology/clab-lab2-ring` is not included in `.gitignore`.
 
@@ -666,12 +663,12 @@ Objective: bring the new topology file and scripts into your existing repository
 
 ### Questions and Deliverables
 
-1. Provide the output of git status from step 3, confirming what is excluded.
+1. Provide the output of `git status`, confirming the global `.gitignore` is protecting the repository from "dirty" commits.
 2. Provide the output of `git log --oneline -5` after your commit.
 
 # Clean Up
 
-You can destroy the lab now, but before that, you will need to save the device configurations to be reused in future labs. Typically, you would do that in each device individually using commands such as `write memory`, by containerlab offers a convenient way to to perform configuration save for all the containers running in a lab.
+You can destroy the lab now, but before that, you will need to save the device configurations to be reused in future labs. Typically, you would do that in each device individually using commands such as `write memory`, but containerlab offers a convenient way to to perform configuration save for all containers running in the lab.
 
 ```bash
 cd ~/labs/lab2/topology
@@ -688,7 +685,7 @@ sudo containerlab destroy -t lab2-ring.clab.yml
 
 Destroying and later redeploying this topology will bring the containers back and restore the topology with the saved configurations.
 
-Deactivate the python virtual environment:
+Deactivate the virtual environment:
 
 ```bash
 deactivate
@@ -700,8 +697,8 @@ Confirm your repository includes, at minimum, the following, then submit as inst
 
 - labs/lab2/topology/lab2-ring.clab.yml
 - labs/lab2/scripts/connect_ceos1.py, parse_ceos1.py, and inventory_check.py
-- labs/lab2/requirements.txt
-- The updated .gitignore excluding lab2/.velab2/ and lab2/topology/clab-lab2-ring
+- The updated root level `~/labs/requirements.txt`
+- The updated `.gitignore`
 - Your answers to the Questions and Deliverables sections, submitted as your lab report per your instructor's separate instructions
 
 ```bash
@@ -770,10 +767,9 @@ git log --oneline --graph -10
 
 | Command | Usage |
 |---|---|
-| python3 -m venv .velab2 | Create a virtual environment |
-| source .velab2/bin/activate | Activate a virtual environment |
+| source ~/labs/.velab/bin/activate | Activate the global virtual environment |
 | pip install <package> | Install a package inside the active environment |
-| pip freeze > requirements.txt | Record installed packages and their versions |
+| pip freeze > ~/labs/requirements.txt | Record packages in the global requirements file |
 | ConnectHandler(**params) | Open a Netmiko connection to a device |
 | connection.send_command(<command>) | Send a command and return its output as a string |
 | re.finditer(pattern, text) | Iterate over every regex match in a string |
