@@ -7,7 +7,7 @@ invoke==3.0.3
 lxml==6.1.1
 ncclient==0.7.1
 netconf-console2==3.0.1
-paramiko==5.0.0
+paramiko<5.0,>=3.5.0
 protobuf==7.35.1
 pyaml==26.7.0
 pyang==2.7.1

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import sys
+from devicelib import DEFAULT_CONFIG_FILE, load_devices
 from ncclient import manager
-from devicelib import load_devices, DEFAULT_CONFIG_FILE
-
+from urllib.parse import urlparse, parse_qs
 
 def get_capabilities(m):
     """Prints the capabilities supported by the device."""
@@ -10,14 +10,35 @@ def get_capabilities(m):
     for cap in sorted(caps):
         print(cap)
 
-
-def get_modules(m):
-    """Prints the YANG modules supported by the device."""
+def get_modules(m, max_extras_len=80):
+    """Prints the YANG modules supported by the device in a nice, aligned format."""
     mods = [c for c in m.server_capabilities if "module=" in c]
-    for mod in sorted(mods):
-        print(mod)
 
+    parsed = []
+    for cap in mods:
+        query = parse_qs(urlparse(cap).query)
+        name = query.get("module", [""])[0]
+        revision = query.get("revision", [""])[0]
+        extras = []
+        if "deviations" in query:
+            extras.append(f"deviations={query['deviations'][0]}")
+        if "features" in query:
+            extras.append(f"features={query['features'][0]}")
+        parsed.append((name, revision, ", ".join(extras)))
 
+    parsed.sort(key=lambda x: x[0])
+
+    name_width = max((len(p[0]) for p in parsed), default=0)
+    rev_width = max((len(p[1]) for p in parsed), default=0)
+
+    for name, revision, extras in parsed:
+        if len(extras) > max_extras_len:
+            extras = extras[:max_extras_len - 3] + "..."
+        line = f"{name:<{name_width}}  rev={revision:<{rev_width}}"
+        if extras:
+            line += f"  [{extras}]"
+        print(line)
+                
 def get_config(m, filter_xml):
     """Retrieves and prints the network-instance configuration."""
     config = m.get_config(source="running", filter=("subtree", filter_xml))
