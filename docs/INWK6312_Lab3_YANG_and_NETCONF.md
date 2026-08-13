@@ -51,49 +51,47 @@ NETCONF runs on TCP port 830 on both cEOS and SR Linux in this topology, and bot
 
 ## Task 0: Environment Check and Tooling Setup
 
-Objective: Start the topology created in Lab2, set up this lab's folder structure and virtual environment, and download some NETCONF tools.
+Objective: Copy and start the topology created in Lab2, set up this lab's folder structure and download some NETCONF tools.
 
-1. Start the Containerlab topology.
+1. If you forgot to destroy the topology in Lab 2, do this now, otherwise skip this step.
 
     ```bash
-    sudo containerlab deploy -t ~/labs/lab2/topology/lab2-ring.clab.yml
+    sudo containerlab save -t ~/labs/lab2/topology/lab-net.clab.yml
+    sudo containerlab destroy -t ~/labs/lab2/topology/lab-net.clab.yml
     ```
 
-    If you receive a message about containers already exist (perhaps because the topology was not destroyed in the previous lab session), inspect the topology to confirm:
+2. Copy the Containerlab topology and the auto-generated folder from lab2 to the root of your repo.
 
     ```bash
-    sudo containerlab inspect -t ~/labs/lab2/topology/lab2-ring.clab.yml
+    cp ~/labs/lab2/topology/lab-net.clab.yml ~/labs/topology
+    sudo cp ~/labs/lab2/topology/clab-lab-net ~/labs/topology
+    ```
+
+3. Deploy the topology from the new location. You should also confirm that the nodes still retain their configuration.
+
+    ```bash
+    sudo containerlab deploy -t ~/labs/topology/lab-net.clab.yml
     ```    
 
-    You should see all three nodes running. If this task fails, redeploy and reconfigure the topology using Lab 2 Tasks 3 and 4 before continuing.
-
-2. Create this lab's folder structure.
-
-    ```bash
-    mkdir -p ~/labs/lab3/data ~/labs/lab3/yang ~/labs/lab3/scripts
-    cd ~/labs/lab3
-    ```
-
-3. Create and activate a virtual environment for this lab.
-
-    ```bash
-    python3 -m venv .velab3
-    source .velab3/bin/activate
-    ```
-
-4. Clone the tools repository outside this repository entirely, so it never becomes a nested git repository inside your own.
+4. Clone the tools repository outside this lab's repository to keep them separate. These tools will be used in this and future labs.
 
     ```bash
     cd ~
-    git clone https://github.com/martimy/netconf-gnmi-tools tools
+    git clone https://github.com/martimy/Automation-Labs tools
     ```
 
-5. Copy the files this lab uses into your own lab3/scripts folder and confirm that `nc_wrapper.sh` is executable.
+    <!--future -->
 
     ```bash
-    cp ~/tools/nc_wrapper.sh ~/tools/netconf_tool.py \
-    ~/tools/devicelib.py ~/tools/devices.yaml ~/labs/lab3/scripts/
-    ls -l ~/labs/lab3/scripts
+    cd ~
+    git clone -b tools --single-branch --depth=1 https://github.com/martimy/Automation-Labs tools
+    ```
+
+5. Copy the tools into your own labs/tools folder and confirm that `nc_wrapper.sh` is executable.
+
+    ```bash
+    cp ~/tools/* ~/labs/tools/.
+    ls -l ~/labs/tools
     ```
 
 6. Check both files against this topology's node names, ceos1, ceos2, and srl1. `nc_wrapper.sh` already matches, no edit needed there. `devices.yaml` does not, compare its device entries against `nc_wrapper.sh`'s CREDENTIALS list, find what's wrong, and fix it.
@@ -111,6 +109,14 @@ Objective: Start the topology created in Lab2, set up this lab's folder structur
     ```bash
     pyang --version
     netconf-console2 --help | head -5
+    ```
+
+
+5. Create this lab's folder structure.
+
+    ```bash
+    mkdir -p ~/labs/lab3/data ~/labs/lab3/yang ~/labs/lab3/scripts
+    cd ~/labs/lab3
     ```
 
 ### Questions and Deliverables

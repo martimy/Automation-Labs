@@ -1,13 +1,34 @@
 ---
-title: Lab 2
+title: INWK6312 - Lab 2
 subtitle: Containers, Network Emulation, and Python Automation Foundations
 highlight-style: tango
 toc: true
+fontsize: 11pt
+numbersections: false
+colorlinks: true
+listings: true
+documentclass: article
 output:
     pdf_document:
         toc_depth: 2
         highlight: custom-tango.theme # option: tango, pygments, kate, monochrome, espresso, haddock, breezedark
 geometry: margin=1in
+
+header-includes: |
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+  \usepackage{fancyhdr}
+  \usepackage{lastpage}
+  \pagestyle{fancy}
+  \fancyhf{}
+  
+  \lhead{\title}
+  \renewcommand{\headrulewidth}{0.5pt}
+
+  \lfoot{v1.0}
+  \cfoot{\copyright\ 2026 INWK6312}
+  \rfoot{Page \thepage\ of \pageref{LastPage}}
+  \renewcommand{\headrulewidth}{0.5pt}
 ---
 
 \newpage
@@ -15,8 +36,6 @@ geometry: margin=1in
 # Introduction
 
 This lab covers Docker then use Containerlab to deploy a small mixed vendor topology, two Arista cEOS nodes and one Nokia SR Linux node, connected in a ring. You will bring up Layer 3 reachability on that topology by hand, using each vendor's own CLI. In the second part of the lab, you will build an isolated Python environment and use Netmiko to talk to the Arista nodes over SSH instead of typing commands yourself, parse the CLI output you get back, and handle a connection failure with a custom exception instead of letting the script crash.
-
-This lab continues in the same repository you created in Lab 1. Your local folder for that repository is still named `~/labs`, that name refers to the repository itself, not to this specific lab, you will simply add a new `lab2` folder inside it.
 
 <!--
 The Nokia SR Linux node is present in this lab mainly to establish the topology mechanics. You will bring its interfaces up so the topology is fully reachable, but you will not push it hard on the CLI or YANG side yet, that comes later once the course reaches NETCONF, RESTCONF, and native YANG modeling.
@@ -39,15 +58,14 @@ By the end of this lab, you will be able to:
 
 You will need:
 
-- Your assigned Ubuntu VM, with Docker, Containerlab, and Python 3 with the venv module preinstalled
-- The `ceos:v4.36` and `ghcr.io/nokia/srlinux:26.7.1-554-amd64` images already pulled and available locally, confirm this in Task 0
+- Your assigned Ubuntu VM IP address provided in Brightspace: ________________.
+- Docker, Containerlab, and Python 3 with the venv module preinstalled.
+- The `ceos:v4.36` and `ghcr.io/nokia/srlinux:26.7.1-554-amd64` images already pulled and available locally.
 - Your GitHub Classroom repository from Lab 1, cloned and up to date on this VM
 
-If any of the tools or images above are missing when you reach that step, check with your lab instructor before trying to install or pull anything yourself.
+If any of the components above are missing, check with your lab instructor before starting the lab.
 
 Containerlab operations in this lab require sudo, since they create network namespaces and manage Docker on your behalf. Commands that need it are shown with sudo, if a command does not show sudo, you should not need it.
-
-Note that both the cEOS and SR Linux images ship with a default login account already configured, and Containerlab automatically registers each deployed node's hostname in your VM's own /etc/hosts file, so you can reach a node by name instead of hunting down its management IP address.
 
 \newpage
 
@@ -55,7 +73,7 @@ Note that both the cEOS and SR Linux images ship with a default login account al
 
 ## Task 0: Docker Environment Review
 
-Objective: confirm your environment is ready and connect what Lecture 4 covered about images, layers, and containers to what is actually sitting on your VM. This is a review, you will not build or modify any images in this task.
+Objective: confirm your environment is ready. You will not build or modify any images in this task.
 
 1. Confirm Docker is available and check the version[^docker].
 
@@ -84,22 +102,25 @@ Objective: confirm your environment is ready and connect what Lecture 4 covered 
     docker system df
     ```
 
-5. Confirm Containerlab is installed and check its version.
+5. Confirm Containerlab is installed and check its version[^clab].
 
     ```bash
     containerlab version
     ```
 
-[^docker]: This lab was tested using v29.7.1.
+[^docker]: This lab was tested using Docker v29.7.1.
+[^clab]: this lab was testing using Containerlab v0.77
 
 ### Questions and Deliverables
 
-1. Compare the Size field for ceos:v4.36 and the SR Linux image from step 3. Which one is larger, and does that match the DISK USAGE or CONTENT SIZE columns you would see in a full docker image ls output?
-2. In your own words, why does an image stay the same, unchanged object no matter how many containers you create from it?
+1. Compare the Size field for the cEOS and the SR Linux images from step 3. Which one is larger, and does that match the DISK USAGE or CONTENT SIZE columns you would see in a full docker image ls output?
+2. Why does an image stay the same, unchanged object no matter how many containers you create from it?
 
 ## Task 1: Your First Containerlab Node, Arista cEOS
 
-Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy it, before combining anything with anything else.
+Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy it, before creating any topology.
+
+> Note: Both the cEOS and SR Linux images ship with a default login account already configured, and Containerlab automatically registers each deployed node's hostname in your VM's own `/etc/hosts` file, so you can reach a node by name instead of its management IP address.
 
 1. Create the folder structure this lab will use.
 
@@ -108,7 +129,7 @@ Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy
     cd ~/labs/lab2/topology
     ```
 
-2. Create a small throwaway topology file with a single cEOS node.
+2. Create a small temporary topology file with a single cEOS node.
 
     ```bash
     nano test-ceos.clab.yml
@@ -138,10 +159,10 @@ Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy
 5. Connect directly to its CLI. Containerlab names the underlying container `clab-<lab-name>-<node-name>`, so this node is `clab-test-ceos-ceos1`.
 
     ```bash
-    sudo docker exec -it clab-test-ceos-ceos1 Cli
+    docker exec -it clab-test-ceos-ceos1 Cli
     ```
 
-    You can also login via SSH using default username/password=`admin/admin` (recommended):
+    Log in via SSH using the default username/password=`admin/admin`.
 
     ```bash
     ssh admin@clab-test-ceos-ceos1
@@ -155,7 +176,7 @@ Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy
     exit
     ```
 
-7. Destroy the lab, you are done with this throwaway topology.
+7. Destroy the lab, you are done with this topology.
 
     ```bash
     sudo containerlab destroy -t test-ceos.clab.yml --cleanup
@@ -173,7 +194,7 @@ The local `--cleanup` flag instructs containerlab to remove the auto-generated l
 
 Objective: deploy a single SR Linux node on its own, and get a first look at how its command structure differs from EOS, before destroying it.
 
-1. Create a second throwaway topology file.
+1. Create a second temporary topology file.
 
     ```bash
     cd ~/labs/lab2/topology
@@ -197,13 +218,13 @@ Objective: deploy a single SR Linux node on its own, and get a first look at how
     sudo containerlab inspect -t test-srl.clab.yml
     ```
 
-3. Connect to the SR Linux CLI. Note the command is `sr_cli`, not `Cli`.
+3. Connect to the SR Linux CLI. Note the command is `sr_cli`, not `Cli`. Type `quit` and `ENTER` to exit.
 
     ```bash
-    sudo docker exec -it clab-test-srl-srl1 sr_cli
+    docker exec -it clab-test-srl-srl1 sr_cli
     ```
 
-    You can also login via SSH using default username/password=`admin/NokiaSrl1!` (recommnded):
+    Log in via SSH using default the username/password=`admin/NokiaSrl1!`.
 
     ```bash
     ssh admin@clab-test-srl-srl1
@@ -229,7 +250,7 @@ Objective: deploy a single SR Linux node on its own, and get a first look at how
 2. The SR Linux prompt looks like `--{ running }--[ ]--`, while the EOS prompt you saw in Task 1 was a plain hostname and symbol. What does the running portion of the SR Linux prompt tell you that the EOS prompt does not?
 3. Which interface is up?
 
-## Task 3: Building the Three Node Ring
+## Task 3: Building the Three Node Ring Topology
 
 Objective: combine both kinds into the persistent topology that carries forward into the rest of this course.
 
@@ -239,11 +260,11 @@ Three nodes connected in a ring means every node has a direct link to both of th
 
     ```bash
     cd ~/labs/lab2/topology
-    nano lab2-ring.clab.yml
+    nano lab-net.clab.yml
     ```
 
     ```yaml
-    name: lab2-ring
+    name: lab-net
     prefix: "" # Removes a prefix from the container names
     topology:
       nodes:
@@ -266,13 +287,13 @@ Three nodes connected in a ring means every node has a direct link to both of th
 2. Deploy it.
 
     ```bash
-    sudo containerlab deploy -t lab2-ring.clab.yml
+    sudo containerlab deploy -t lab-net.clab.yml
     ```
 
 3. Verify all three nodes are running.
 
     ```bash
-    sudo containerlab inspect -t lab2-ring.clab.yml
+    sudo containerlab inspect -t lab-net.clab.yml
     ```
 
 4. Confirm Containerlab also registered each node's hostname on your VM. Because the topology file sets prefix to an empty string, the hostname it registers is the plain node name, not a clab prefixed version of it.
@@ -281,7 +302,7 @@ Three nodes connected in a ring means every node has a direct link to both of th
     cat /etc/hosts
     ```
 
-    You should see a block bounded by CLAB-lab2-ring-START and CLAB-lab2-ring-END, mapping ceos1, ceos2, and srl1 to their management IP addresses. From this point on, you can reach any of the three nodes by name, ceos1, ceos2, or srl1, without needing to look up or type its management IP address.
+    You should see a block bounded by CLAB-lab-net-START and CLAB-lab-net-END, mapping `ceos1`, `ceos2`, and `srl1` to their management IP addresses. From this point on, you can reach any of the three nodes by its name without needing to look up or type its management IP address.
 
 5. Cross check from the Docker side as well.
 
@@ -289,21 +310,21 @@ Three nodes connected in a ring means every node has a direct link to both of th
     docker ps
     ```
 
-6. Inspect the topology using the graph command.
+6. Inspect the topology using the graph command, press `CTRL-C` to exit.
 
     ```bash
-    containerlab graph -t lab2-ring.clab.yml
+    containerlab graph -t lab-net.clab.yml
     ```
 
 ### Questions and Deliverables
 
-1. Provide the output of containerlab inspect -t lab2-ring.clab.yml.
-2. Provide the block from /etc/hosts between the CLAB-lab2-ring-START and CLAB-lab2-ring-END markers.
+1. Provide the output of containerlab `inspect -t lab-net.clab.yml`.
+2. What does specifying a kind actually control in containerlab toplogy file?
 3. Explain why the node names do not include the lab name prefix.
 
 ## Task 4: Configuring Layer 3 Reachability
 
-Objective: bring up an IP address on each side of every link by hand, using each vendor's own CLI. Both cEOS and SR Linux already ship with a default login account, admin/admin on cEOS and admin/NokiaSrl1! on SR Linux, so Part B's Netmiko script will be able to authenticate without any extra setup here.
+Objective: bring up an IP address on each side of every link by hand, using each vendor's own CLI.
 
 Addressing plan for this topology:
 
@@ -346,7 +367,7 @@ Configure each node fully, and verify it, before moving to the next one. A typo 
     show ip interface brief
     ```
 
-    Both Ethernet1 and Ethernet2 should show your assigned addresses with a status and protocol of up. Then leave the CLI with exit.
+    Both Ethernet1 and Ethernet2 should show your assigned addresses with a status and protocol of up. Then leave the CLI with `exit`.
 
 4. Repeat the same pattern on ceos2, with its own addresses.
 
@@ -391,7 +412,7 @@ Configure each node fully, and verify it, before moving to the next one. A typo 
     diff
     ```
 
-    Both ethernet-1/1 and ethernet-1/2 should show as up, with the addresses you just assigned. Also both interfaces should be assigned to the default network instance.
+    The `admin-state` of both `ethernet-1/1.0` and `ethernet-1/2.0` should show as `enable`, with the addresses you just assigned. Also both interfaces should be assigned to the `default` network instance.
 
 7. Commit and exit
 
@@ -402,37 +423,37 @@ Configure each node fully, and verify it, before moving to the next one. A typo 
 
     If commit is not successful, enter `discard stay` and repeat steps 5 to 7.
 
-
 ### Questions and Deliverables
 
-1. Provide the show ip interface brief output from ceos1 and ceos2.
+1. Provide the `show ip interface brief` output from `ceos1` and `ceos2`.
 2. Provide the output of the `diff` command from srl1.
-
 
 ## Task 5: Verifying the Full Mesh
 
-Objective: confirm every node can reach both of its neighbors directly.
+Objective: confirm every node can reach both of its neighbors directly. Use Docker command or log into the node and use the CLI.
 
-1. From ceos1, ping both neighbors.
+1. From `ceos1`, ping both neighbors (without logging-in).
 
     ```text
-    ping 10.0.12.2
-    ping 10.0.13.1
+    docker exec -it ceos1 Cli -c "ping 10.0.12.2"
+    docker exec -it ceos1 Cli -c "ping 10.0.13.1"
     ```
 
-2. From ceos2, ping both neighbors.
+2. From `ceos2`, ping both neighbors.
 
     ```text
-    ping 10.0.12.1
-    ping 10.0.23.2
+    docker exec -it ceos2 Cli -c "ping 10.0.12.1"
+    docker exec -it ceos2 Cli -c "ping 10.0.23.2"
     ```
 
 3. From srl1, ping both neighbors. SR Linux requires the network instance to be specified on the ping command itself.
 
     ```text
-    ping 10.0.23.1 network-instance default
-    ping 10.0.13.2 network-instance default
+    docker exec -it srl1 sr_cli ping -c 5 10.0.23.1 network-instance default
+    docker exec -it srl1 sr_cli ping -c 5 10.0.13.2 network-instance default
     ```
+
+    Note: Use `CTRL-c` multiple times then `CTRL-d` or `CTRL-q` to force quit.
 
 ### Questions and Deliverables
 
@@ -505,12 +526,12 @@ Objective: connect to ceos1 over SSH using Netmiko instead of docker exec, and p
     connection.disconnect()
     ```
 
-    This works because Containerlab added ceos1 to your VM's own /etc/hosts file when you deployed the topology in Task 3. You can also replace it with the node's management IP address from the containerlab inspect output, if you prefer.
+    This code uses the node's name `ceos1`. You can also use the node's management IP address, if you prefer.
 
 2. Run it.
 
     ```bash
-    python scripts/connect_ceos1.py
+    python3 scripts/connect_ceos1.py
     ```
 
 3. Verify the printed output matches what you saw directly on the CLI in Task 4, Netmiko is automating the same SSH session you could type by hand, it should show the same two interfaces and addresses.
@@ -551,10 +572,10 @@ Objective: turn the raw text from Task 7 into structured data your own code can 
         print(match.group("interface"), match.group("ip"), match.group("status"))
     ```
 
-2. Run it, and confirm it prints one line per interface that has an IP address, Ethernet1, Ethernet2, and Management1, correctly split into separate fields.
+2. Run it, and confirm it prints one line per interface that has an interface name, IP address, and status, correctly split into separate fields.
 
     ```bash
-    python scripts/parse_ceos1.py
+    python3 scripts/parse_ceos1.py
     ```
 
 3. Add an if statement so the script only prints non-management interfaces whose status is up, without a change to the regex itself.
@@ -607,24 +628,20 @@ Objective: extend the script to loop over both cEOS nodes, and make sure one unr
 2. Run it, and confirm both devices report correctly.
 
     ```bash
-    python scripts/inventory_check.py
+    python3 scripts/inventory_check.py
     ```
 
-3. Now deliberately break it. Change ceos1's host address in the devices list to something unreachable, such as 10.0.0.99, and run the script again.
-
-    ```bash
-    python scripts/inventory_check.py
-    ```
+3. Now deliberately break it. Change the host address for node `ceos1` to something else unreachable, such as `host=ceos3` or `host=10.99.0.1` and run the script again.
 
 4. Confirm the script prints a clear Skipping message for ceos1, naming it specifically, and still completes successfully for ceos2, rather than stopping on the first failure.
 
-5. Restore ceos1's correct address before moving on.
+5. Restore `ceos1`'s correct address before moving on.
 
 
 ### Questions and Deliverables
 
 1. Provide the output from both the working run in step 2 and the deliberately broken run in step 3.
-2. NetmikoTimeoutException and NetmikoAuthenticationException are caught specifically here, rather than a single bare except. Give one practical reason a script managing many devices would want to know which of these two happened, rather than only knowing that something failed.
+2. *NetmikoTimeoutException* and *NetmikoAuthenticationException* are caught specifically here, rather than a single bare except. Give one practical reason a script managing many devices would want to know which of these two happened, rather than only knowing that something failed.
 
 ## Task 10: Committing Your Work
 
@@ -637,22 +654,14 @@ Objective: Stage your changes using the global Git configuration established in 
     git status
     ```
 
-2. Verify that the global `.gitignore` created in Lab 1 is correctly excluding the `.velab/` directory and `clab-` artifacts.
-
-    ```bash
-    echo "lab2/topology/clab-" >> .gitignore
-    ```
-
-3. Stage your `lab2` directory and the updated `requirements.txt` and `.gitignore`.
+2. Stage your `lab2` directory and the updated `requirements.txt`.
 
     ```bash
     git add lab2 requirements.txt .gitignore
     git status
     ```
 
-    Confirm that no environment folders or temporary `Containerlab` files are being tracked.
-    
-    Note: `git add` command is likely to produce a warning about adding embedded git repository if `lab2/topology/clab-lab2-ring` is not included in `.gitignore`.
+3. Confirm that no environment folders or temporary `Containerlab` files are being tracked. `git add` command is likely to produce an error about adding embedded git repository if `**/clab-*/` is not included in `.gitignore`.
 
 4. Commit and push.
 
@@ -671,16 +680,15 @@ Objective: Stage your changes using the global Git configuration established in 
 You can destroy the lab now, but before that, you will need to save the device configurations to be reused in future labs. Typically, you would do that in each device individually using commands such as `write memory`, but containerlab offers a convenient way to to perform configuration save for all containers running in the lab.
 
 ```bash
-cd ~/labs/lab2/topology
-sudo containerlab save -t lab2-ring.clab.yml
+sudo containerlab save -t ~/labs/lab2/topology/lab-net.clab.yml
 ```
 
-The `save` command will save the configuration files under the directory `lab2/topology/clab-lab2-ring`, which is not tracked by git.
+The `save` command will save the configuration files under the directory `lab2/topology/clab-lab-net`, which is not tracked by git.
 
 Destroy the topology:
 
 ```bash
-sudo containerlab destroy -t lab2-ring.clab.yml
+sudo containerlab destroy -t ~/labs/lab2/topology/lab-net.clab.yml
 ```
 
 Destroying and later redeploying this topology will bring the containers back and restore the topology with the saved configurations.
@@ -695,18 +703,80 @@ deactivate
 
 Confirm your repository includes, at minimum, the following, then submit as instructed by your course delivery platform:
 
-- labs/lab2/topology/lab2-ring.clab.yml
+- labs/lab2/topology/lab-net.clab.yml
 - labs/lab2/scripts/connect_ceos1.py, parse_ceos1.py, and inventory_check.py
 - The updated root level `~/labs/requirements.txt`
-- The updated `.gitignore`
 - Your answers to the Questions and Deliverables sections, submitted as your lab report per your instructor's separate instructions
+- git log `git log --oneline --graph -10`
 
-```bash
-git log --oneline --graph -10
-```
 
 \newpage
 
+# Appendix: Command Summary
+
+## Docker and Containerlab
+
+| Command | Usage |
+|---|---|
+| docker version | Confirm the installed Docker version |
+| docker images | List Docker images available on the host |
+| docker system df | Show Docker disk usage and storage summary |
+| containerlab version | Confirm the installed Containerlab version |
+| sudo containerlab deploy -t \<topology file\> | Deploy the multi vendor topology |
+| containerlab inspect -t \<topology file\> | View the status and management IP addresses of nodes |
+| sudo containerlab graph -t \<topology file\> | Generate a visual graph of the topology |
+| sudo containerlab save -t \<topology file\> | Save the running configuration of all nodes |
+| sudo containerlab destroy -t \<topology file\> | Stop the lab and remove containers |
+| ssh admin@ceos1 | Connect to a node CLI via SSH |
+
+## Arista EOS CLI Essentials
+
+| Command | Usage |
+|---|-----|
+| enable | Enter privileged EXEC mode |
+| configure | Enter global configuration mode |
+| no switchport | Convert a layer 2 interface into a routed layer 3 port |
+| show ip interface brief | Display the status and IP addresses of interfaces |
+| show version | Report the EOS software version |
+
+## Nokia SR Linux CLI Essentials
+
+| Command | Usage |
+|---|-----|
+| sr_cli | Enter the SR Linux interactive CLI |
+| enter candidate | Enter the candidate datastore for configuration |
+| commit save | Commit changes and save them to the startup configuration |
+| discard stay | Discard uncommitted changes while remaining in the CLI |
+| show interface | Display interface status and addressing |
+
+## Python and Virtual Environments
+
+| Command | Usage |
+|---|-----|
+| source ~/labs/.velab/bin/activate | Activate the centralized virtual environment |
+| pip install netmiko | Install the Netmiko library for SSH automation |
+| pip freeze > ~/labs/requirements.txt | Update the cumulative requirements file |
+| python3 connect_ceos1.py | Execute a Python automation script |
+| deactivate | Exit the virtual environment |
+
+#### Git Version Control
+
+| Command | Usage |
+|---|-----|
+| git status | Check the status of staged and unstaged changes |
+| git add \<directory/\> | Stage the directory for commit |
+| git commit -m "message" | Record staged changes to the repository history |
+| git push | Upload local commits to the remote GitHub repository |
+| git log --oneline -5 | View a simplified history of the last five commits |
+
+## Default Credentials
+
+| Kind | Username | Password |
+|---|---|---|
+| Arista cEOS | admin | admin |
+| Nokia SR Linux | admin | NokiaSrl1! |
+
+<!--
 # Appendix: Command Summary
 
 ## Containerlab
@@ -727,7 +797,7 @@ git log --oneline --graph -10
 ## Arista EOS
 
 | Command | Usage |
-|---|---|
+|---|-----|
 | enable | Enter privileged exec mode after logging in over SSH |
 | show version | Display the running EOS software version |
 | show interfaces status | Display interface link status |
@@ -742,7 +812,7 @@ git log --oneline --graph -10
 ## Nokia SR Linux
 
 | Command | Usage |
-|---|---|
+|---|-----|
 | show version | Display the running SR Linux software version |
 | show interface brief | Display a summary of all interfaces |
 | show interface <name> | Display detailed status for one interface |
@@ -766,7 +836,7 @@ git log --oneline --graph -10
 ## Python and Netmiko
 
 | Command | Usage |
-|---|---|
+|---|-----|
 | source ~/labs/.velab/bin/activate | Activate the global virtual environment |
 | pip install <package> | Install a package inside the active environment |
 | pip freeze > ~/labs/requirements.txt | Record packages in the global requirements file |
@@ -774,3 +844,4 @@ git log --oneline --graph -10
 | connection.send_command(<command>) | Send a command and return its output as a string |
 | re.finditer(pattern, text) | Iterate over every regex match in a string |
 | match.group("<name>") | Retrieve a named capture group from a regex match |
+-->
