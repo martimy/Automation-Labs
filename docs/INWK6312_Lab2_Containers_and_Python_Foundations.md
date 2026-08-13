@@ -104,8 +104,7 @@ Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy
 1. Create the folder structure this lab will use.
 
     ```bash
-    mkdir -p ~/labs/lab2/topology
-    mkdir -p ~/labs/lab2/scripts
+    mkdir -p ~/labs/lab2/topology ~/labs/lab2/scripts
     cd ~/labs/lab2/topology
     ```
 
@@ -448,16 +447,16 @@ Objective: confirm every node can reach both of its neighbors directly.
 
 Objective: Activate the virtual environment and update the global dependencies.
 
-1. Move into your lab2 folder.
+1. Move into your labs folder.
 
     ```bash
-    cd ~/labs/lab2
+    cd ~/labs
     ```
 
 2. Activate the virtual environment created in Lab 1.
 
     ```bash
-    source ~/labs/.velab/bin/activate
+    source .velab/bin/activate
     ```
 
     Your prompt should now be prefixed with (.velab).
@@ -471,7 +470,7 @@ Objective: Activate the virtual environment and update the global dependencies.
 4. Update the cumulative requirements file at the root of your repository.
 
     ```bash
-    pip freeze > ~/labs/requirements.txt
+    pip freeze > requirements.txt
     ```
 
 ### Questions and Deliverables
@@ -483,9 +482,10 @@ Objective: Activate the virtual environment and update the global dependencies.
 
 Objective: connect to ceos1 over SSH using Netmiko instead of docker exec, and pull the output of one command.
 
-1. Make sure your virtual environment from Task 6 is still active, then create the script.
+1. Make sure your virtual environment from Task 6 is still active, then create a script in `~/labs/lab2/scripts`.
 
     ```bash
+    cd ~/labs/lab2
     nano scripts/connect_ceos1.py
     ```
 
