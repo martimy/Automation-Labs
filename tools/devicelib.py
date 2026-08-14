@@ -4,10 +4,15 @@ import sys
 import os
 import yaml
 
+# Directory this module lives in
+_MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Default path to the shared device configuration file; can be overridden
 # with the DEVICES_FILE environment variable.
-DEFAULT_CONFIG_FILE = os.environ.get("DEVICES_FILE", "devices.yaml")
-
+DEFAULT_CONFIG_FILE = os.environ.get(
+    "DEVICES_FILE",
+    os.path.join(_MODULE_DIR, "devices.yaml")
+)
 
 def load_devices(protocol, config_file=DEFAULT_CONFIG_FILE):
     """Loads device connection parameters for a given protocol ('netconf' or

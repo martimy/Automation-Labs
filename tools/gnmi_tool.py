@@ -4,18 +4,20 @@ import json
 from pygnmi.client import gNMIclient
 from devicelib import load_devices, DEFAULT_CONFIG_FILE
 
-
 def get_modules(gc):
-    """Prints the modules supported by the device."""
-    capabilities = gc.capabilities()
+    """Prints the YANG modules supported by the device in a nice, aligned format."""
     mods = [
-        f'{c["name"]}, {c["organization"]}, {c["version"]}'
-        for c in capabilities["supported_models"]
+        (c["name"].split(":")[-1], c["organization"], c["version"])
+        for c in gc.capabilities()["supported_models"]
     ]
-    for mod in sorted(mods):
-        print(mod)
+    mods.sort(key=lambda x: x[0])
 
+    name_width = max((len(name) for name, _, _ in mods), default=0)
+    org_width = max((len(org) for _, org, _ in mods), default=0)
 
+    for name, org, version in mods:
+        print(f"{name:<{name_width}}  {org:<{org_width}}  {version}")
+        
 def get_config(gc, path):
     """Retrieves and prints configuration."""
     result = gc.get(path=[path], datatype="config")
