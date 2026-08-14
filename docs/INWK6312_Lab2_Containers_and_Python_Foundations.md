@@ -61,11 +61,11 @@ You will need:
 - Your assigned Ubuntu VM IP address provided in Brightspace: ________________.
 - Docker, Containerlab, and Python 3 with the venv module preinstalled.
 - The `ceos:v4.36` and `ghcr.io/nokia/srlinux:26.7.1-554-amd64` images already pulled and available locally.
-- Your GitHub Classroom repository from Lab 1, cloned and up to date on this VM
+- Your GitHub Classroom repository
 
 If any of the components above are missing, check with your lab instructor before starting the lab.
 
-Containerlab operations in this lab require sudo, since they create network namespaces and manage Docker on your behalf. Commands that need it are shown with sudo, if a command does not show sudo, you should not need it.
+Containerlab operations in this lab require `sudo`, since they create network namespaces and manage Docker on your behalf. Commands that need it are shown with `sudo`, if a command does not show `sudo`, you should not need it.
 
 \newpage
 

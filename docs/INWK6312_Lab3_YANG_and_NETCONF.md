@@ -1,26 +1,41 @@
 ---
-title: Lab 3
+title: INWK6312 - Lab 3
 subtitle: Data Modeling and NETCONF Automation
 highlight-style: tango
 toc: true
+fontsize: 11pt
+numbersections: false
+colorlinks: true
+listings: true
+documentclass: article
 output:
-  pdf_document:
-    highlight: custom-tango.theme # option: tango, pygments, kate, monochrome, espresso, haddock, breezedark
-    toc_depth: 2
+    pdf_document:
+        toc_depth: 2
+        highlight: custom-tango.theme # option: tango, pygments, kate, monochrome, espresso, haddock, breezedark
 geometry: margin=1in
+
+header-includes: |
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+  \usepackage{fancyhdr}
+  \usepackage{lastpage}
+  \pagestyle{fancy}
+  \fancyhf{}
+  
+  \lhead{\title}
+  \renewcommand{\headrulewidth}{0.5pt}
+
+  \lfoot{v1.0}
+  \cfoot{\copyright\ 2026 INWK6312}
+  \rfoot{Page \thepage\ of \pageref{LastPage}}
+  \renewcommand{\headrulewidth}{0.5pt}
 ---
 
 \newpage
 
 # Introduction
 
-This lab covers material from Lecture 5 and Lecture 6. You will spend the first part of the lab working with data formats and YANG outside of any live device, converting a small dataset between JSON and YAML, reading an RFC 8340 tree diagram, and using pyang to catch errors in a YANG module before you would ever trust it against real hardware. In the second part, you will point NETCONF tools at the ring topology from Lab 2, srl1 in particular, discover what it supports, read a real configuration payload back off the wire, and then write your own short script using ncclient to edit and commit a change through its candidate datastore.
-
-This lab starts by redeploying your Lab 2 ring from its saved state, see Task 0. If Lab 2's interface configuration doesn't come back with it, redeploy and reconfigure it using Lab 2 Tasks 3 and 4 before continuing.
-
-RESTCONF is not covered hands on in this lab. Arista supports it, but only after a certificate and an access control change that add real setup time without teaching anything NETCONF hasn't already covered, and Nokia SR Linux does not implement it at all, offering JSON-RPC in its place. It stays a short conceptual question instead of a task.
-
-srl1 carries the heavy NETCONF and YANG work in this lab, consistent with how Lab 2 scoped things, heavy CLI use on Arista, heavy YANG use on Nokia. ceos1 and ceos2 show up mainly for comparison.
+The first part of this lab covers working with data formats and YANG outside of any live device, and using pyang tool to catch errors in a YANG module before using it in real hardware. The second part covers using NETCONF tools to discover what a network device supports, read write a configuration payload.
 
 # Lab Objectives
 
@@ -38,10 +53,11 @@ By the end of this lab, you will be able to:
 
 You will need:
 
-- Your Lab 2 ring, redeployed from its saved state in Task 0, with ceos1, ceos2, and srl1 carrying their Lab 2 interface addressing
-- Your GitHub Classroom repository, cloned and up to date on this VM, now containing labs/lab1 and labs/lab2
+- Your assigned Ubuntu VM IP address provided in Brightspace: ________________.
+- Your network topology, redeployed from its saved state in Task 0, with nodes carrying their interface configuration
+- Your GitHub Classroom repository
 - pyang already installed on your VM
-- Your instructor's tools repository, https://github.com/martimy/netconf-gnmi-tools, containing nc_wrapper.sh, netconf_tool.py, devicelib.py, and devices.yaml
+- The lab's tools repository, https://github.com/martimy/Automation-Labs
 
 NETCONF runs on TCP port 830 on both cEOS and SR Linux in this topology, and both come with it enabled by default.
 
@@ -60,7 +76,7 @@ Objective: Copy and start the topology created in Lab2, set up this lab's folder
     sudo containerlab destroy -t ~/labs/lab2/topology/lab-net.clab.yml
     ```
 
-2. Copy the Containerlab topology and the auto-generated folder from lab2 to the root of your repo.
+2. Copy the Containerlab topology and the auto-generated folder to `~/labs/topology`.
 
     ```bash
     cp ~/labs/lab2/topology/lab-net.clab.yml ~/labs/topology
@@ -94,25 +110,30 @@ Objective: Copy and start the topology created in Lab2, set up this lab's folder
     ls -l ~/labs/tools
     ```
 
-6. Check both files against this topology's node names, ceos1, ceos2, and srl1. `nc_wrapper.sh` already matches, no edit needed there. `devices.yaml` does not, compare its device entries against `nc_wrapper.sh`'s CREDENTIALS list, find what's wrong, and fix it.
+6. Check files `nc_wrapper.sh` and `devices.yaml` against this topology's node names, `ceos1`, `ceos2`, and `srl1` and credentials to ensure matching. Correct if needed.
 
-7. Install the packages this lab needs, then freeze the exact versions into your own repository.
+7. Activate Python virtual environment.
 
     ```bash
-    cd ~/labs/lab3
+    cd ~/labs
+    source .velab/bin/activate
+    ```
+
+8. Install the packages this lab needs, then freeze the exact versions into your own repository.
+
+    ```bash
     pip install -r ~/tools/requirements.txt
     pip freeze > requirements.txt
     ```
 
-8. Confirm the key tools are available.
+9. Confirm the key tools are available.
 
     ```bash
     pyang --version
     netconf-console2 --help | head -5
     ```
 
-
-5. Create this lab's folder structure.
+10. Create this lab's folder structure.
 
     ```bash
     mkdir -p ~/labs/lab3/data ~/labs/lab3/yang ~/labs/lab3/scripts
@@ -121,8 +142,7 @@ Objective: Copy and start the topology created in Lab2, set up this lab's folder
 
 ### Questions and Deliverables
 
-1. Provide the output of Step 8 above.
-2. What was wrong with devices.yaml before you fixed it, and how did you find it? Confirm your fix by running `python3 netconf_tool.py ceos2 capabilities` successfully.
+1. Provide the file `requirements.txt`
 
 ## Task 1: Converting Data Between JSON and YAML
 
@@ -163,7 +183,7 @@ Objective: convert a small VLAN list between JSON and YAML using Python, and not
 2. Run it.
 
     ```bash
-    python scripts/convert_vlans.py
+    python3 scripts/convert_vlans.py
     ```
 
 3. Confirm data/vlans.yaml was written, and that the round trip assertion passed rather than raising an error.
@@ -207,7 +227,7 @@ Objective: use `pyang` to visualize the standard ietf-interfaces module and iden
 
 ## Task 3: Validating a YANG Module with pyang
 
-Objective: use `pyang` to catch structural and syntax errors in a small module before you would ever trust it against a real device. You are validating a module here, not authoring one from a blank file, that is a deeper skill than most network engineers need day to day.
+Objective: use `pyang` to catch structural and syntax errors in a small module.
 
 1. Create the following file exactly as shown, it has two deliberate errors in it.
 
@@ -266,7 +286,7 @@ Objective: use `pyang` to catch structural and syntax errors in a small module b
 
 ## Task 4: Verifying NETCONF Reachability
 
-Objective: confirm NETCONF is actually listening before you point any tooling at it, the same instinct you already applied to Docker and Containerlab back in Lab 2.
+Objective: confirm NETCONF is enabled and listening on the network nodes.
 
 1. Check the raw NETCONF subsystem directly over SSH. This dumps the server's hello message, its capabilities, then hangs, press Ctrl+C once you've seen it.
 
@@ -283,9 +303,8 @@ Objective: confirm NETCONF is actually listening before you point any tooling at
 3. Now use `nc_wrapper.sh` to do the same thing more cleanly.
 
     ```bash
-    cd ~/labs/lab3/scripts
-    ./nc_wrapper.sh srl1 --hello
-    ./nc_wrapper.sh ceos1 --hello
+    ~/labs/tools/nc_wrapper.sh srl1 --hello
+    ~/labs/tools/nc_wrapper.sh ceos2 --hello
     ```
 
 ### Questions and Deliverables
@@ -295,56 +314,62 @@ Objective: confirm NETCONF is actually listening before you point any tooling at
 
 ## Task 5: Discovering Capabilities, Modules, and a Live Schema
 
-Objective: use `netconf_tool.py` to see what `srl1` actually supports, rather than assuming it matches the standard module you read in Task 2.
+Objective: use `netconf_tool.py` to discover the capabilities of `srl1` and the YANG models it supports.
 
 1. List `srl1`'s capabilities.
 
     ```bash
-    cd ~/labs/lab3/scripts
-    python3 netconf_tool.py srl1 capabilities
+    cd ~/labs/tools
+    ./netconf_tool.py srl1 capabilities
     ```
 
 2. List the YANG modules `srl1` advertises.
 
     ```bash
-    python3 netconf_tool.py srl1 modules
+    ./netconf_tool.py srl1 modules
     ```
 
-3. Search that output for an interfaces related module. Do you see `ietf-interfaces`? You're looking for the exact module actually used for configuration, not just any name containing interfaces, SR Linux advertises several `openconfig-if-*` submodules alongside it, focus on the one named plainly `openconfig-interfaces`.
+3. Search the output for an interfaces' related module. Do you see `*-interfaces` modules are supported?
 
     ```bash
-    python3 netconf_tool.py srl1 modules | grep -i interfaces
+    ./netconf_tool.py srl1 modules | grep -i interfaces
     ```
 
-4. Pull that module's schema directly off the live device, rather than downloading it from anywhere.
+4. Pull that native module's schema directly off the live device, rather than downloading it from anywhere.
 
     ```bash
-    python3 netconf_tool.py srl1 schema <module-name-from-step-3>
+    ./netconf_tool.py srl1 schema srl_nokia-interfaces
     ```
 
     This saves a `.yang` file into your current directory. Move it into your yang folder.
 
     ```bash
-    mv <module-name-from-step-3>.yang ~/labs/lab3/yang/
+    mv srl_nokia-interfaces.yang ~/labs/lab3/yang/
     ```
 
-    <!-- Answer: python3 netconf_tool.py srl1 schema openconfig-interfaces -->
-
-5. Generate a tree of the module you just pulled. This module imports several other OpenConfig modules you haven't downloaded, so `pyang` needs to be told to tolerate the unresolved imports rather than fail on them.
+5. Generate a tree of the module you just pulled. This module imports several other modules you haven't downloaded, so `pyang` needs to be told to tolerate the unresolved imports rather than fail on them.
 
     ```bash
-    pyang -f tree ~/labs/lab3/yang/<module-name-from-step-3>.yang --ignore-errors
+    cd ~/labs/lab3/yang
+    pyang -f tree srl_nokia-interfaces.yang --ignore-errors
+    ```
+
+6. The previous output is large; try again by limiting the depth of the tree.
+
+    ```bash
+    pyang -f tree srl_nokia-interfaces.yang --ignore-errors --tree-depth=2
     ```
 
 ### Questions and Deliverables
 
-1. Which interfaces related module did `srl1` actually advertise in step 3? Is it the standard `ietf-interfaces` module from Task 2, or something else?
-2. Provide the tree output from step 5.
+1. How many interfaces related module did `srl1` actually advertise in step 3?
+2. Why does Nokia SR Linux support all three major module types IETF, OpenConfig, and Native?
+3. Provide the tree output from step 6.
 
 
 ## Task 6: From CLI Configuration to a Real NETCONF Payload
 
-Objective: configure one small, new piece of state through the CLI you already know from Lab 2, then read its real NETCONF representation back off the wire, rather than only ever hand building payloads from a bare tree.
+Objective: configure one small, new piece of state through the CLI, then read its real NETCONF representation back.
 
 Lab 2 configured IP addressing on every interface in this ring but never touched interface descriptions. That gap is what this task fills in.
 
@@ -365,8 +390,7 @@ Lab 2 configured IP addressing on every interface in this ring but never touched
 2. Pull the interfaces portion of the running configuration over NETCONF and save it, rather than trying to filter for just this one interface.
 
     ```bash
-    cd ~/labs/lab3/scripts
-    ./nc_wrapper.sh srl1 --get-config \
+    ~/labs/tools/nc_wrapper.sh srl1 --get-config \
     --filter /interfaces > ~/labs/lab3/data/srl1-interfaces.xml
     ```
 
@@ -376,27 +400,29 @@ Lab 2 configured IP addressing on every interface in this ring but never touched
     grep -B2 -A10 "ethernet-1/2" ~/labs/lab3/data/srl1-interfaces.xml
     ```
 
-4. Look at the namespace declared on the enclosing element in that output, this tells you which YANG module actually owns this data on the wire.
+4. Look at the namespace declared at the tope of the returned configuration, this tells you which YANG module is actually used for the configuration.
+
+    ```bash
+    head ~/labs/lab3/data/srl1-interfaces.xml
+    ```
 
 ### Questions and Deliverables
 
-1. Provide the grep output from step 3, including the namespace declaration on the enclosing element.
+1. Provide the grep output from step 3.
 2. Was the module that owns this data the same one you pulled the schema for in Task 5, or a different one? What does that tell you about how much a vendor can add on top of a standard or OpenConfig model through augmentation?
 
-<!--
-The model is <type xmlns:iana-if-type="urn:ietf:params:xml:ns:yang:iana-if-type">iana-if-type:ethernetCsmacd</type>
--->
 
 ## Task 7: Writing Your Own NETCONF Automation Script
 
-Objective: write a short `ncclient` script that edits and commits a configuration change on `srl1`'s candidate datastore, using the real payload structure you found in Task 6 as your template, rather than a structure someone hands you.
+Objective: write a short `ncclient` script that edits and commits a configuration change on `srl1`'s candidate datastore, using the real payload structure you found in Task 6 as your template.
 
-1. Open `data/srl1-interfaces.xml` and copy the exact XML element for the `ethernet-1/1` interface including the `<interface>...</interface>` tags.
+1. Open `~/labs/lab3/data/srl1-interfaces.xml` and copy the exact XML element for the `ethernet-1/1` interface enclosed within the `<interface>...</interface>` tags.
 
-2. Create the script, and paste your adapted element into the `config_snippet` variable. Add a new description `<description>...</description>` in similar location as the `grep` output of Step 3 in Task 6.
+2. Create the script, and paste your adapted element into the `config_snippet` variable. Add a new description `<description>Link to ceos2</description>` in similar location as the output of Step 3 in Task 6.
 
     ```bash
-    nano ~/labs/lab3/scripts/edit_srl1.py
+    cd ~/labs/lab3/scripts
+    nano edit_srl1.py
     ```
 
     ```python
@@ -410,11 +436,18 @@ Objective: write a short `ncclient` script that edits and commits a configuratio
         "hostkey_verify": False,
     }
 
-    # Paste your adapted element from Task 6 here, targeting ethernet-1/1
-    # instead of ethernet-1/2, wrapped in a <config> element.
     config_snippet = """
-    <config>
-
+    <config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+        <interfaces xmlns="http://openconfig.net/yang/interfaces">
+            <interface>
+                <name>ethernet-1/1</name>
+            <config>
+                <name>ethernet-1/1</name>
+                <enabled>true</enabled>
+                <description>Link to ceos2</description>
+            </config>
+            </interface>
+        </interfaces>
     </config>
     """
 
@@ -427,14 +460,13 @@ Objective: write a short `ncclient` script that edits and commits a configuratio
 3. Run it.
 
     ```bash
-    python edit_srl1.py
+    python3 edit_srl1.py
     ```
 
 4. Verify the change landed, using the same technique from Task 6.
 
     ```bash
-    cd ~/labs/lab3/scripts
-    ./nc_wrapper.sh srl1 --get-config \
+    ~/labs/tools/nc_wrapper.sh srl1 --get-config \
     --filter /interfaces > ~/labs/lab3/data/srl1-interfaces-after.xml
     grep -B2 -A10 "ethernet-1/1" ~/labs/lab3/data/srl1-interfaces-after.xml
     ```
@@ -449,7 +481,7 @@ Objective: write a short `ncclient` script that edits and commits a configuratio
 
 ## Task 8: Committing Your Work
 
-Objective: bring this lab's files into your existing repository, and make sure neither the virtual environment nor your instructor's separate tools repository end up committed by accident.
+Objective: bring this lab's files into your existing repository, excluding the downloaded ietf's YANG modules.
 
 1. Move to the root of your repository.
 
@@ -458,21 +490,20 @@ Objective: bring this lab's files into your existing repository, and make sure n
     git status
     ```
 
-2. Exclude the virtual environment.
+2. Exclude the `ietf` folder.
 
     ```bash
-    echo "lab3/.velab3" >> .gitignore
     echo "lab3/yang/ietf" >> .gitignore
     ```
 
 3. Stage and confirm what is about to be committed.
 
     ```bash
-    git add lab3 .gitignore
+    git add lab3 tools topology requirements.txt .gitignore
     git status
     ```
 
-    Confirm `.velab3` and `ietf` do not appear, and confirm nothing from `~/tools` is listed, since that repository lives outside labs entirely and was never inside anything git add here could reach.
+    Confirm `ietf` is not listed. Are there files not tracked yet? Use `restore --staged <file>` to untrack any files that you do not want to commit.
 
 4. Commit and push.
 
@@ -484,15 +515,15 @@ Objective: bring this lab's files into your existing repository, and make sure n
 ### Questions and Deliverables
 
 1. Provide the output of git status from step 3.
-2. Provide the output of git log --oneline -5 after your commit.
+2. Provide the output of `git log --oneline -5` after your commit.
 
 # Clean Up
 
 Save the running configuration on every node, then destroy the topology.
 
 ```bash
-sudo containerlab save -t ~/labs/lab2/topology/lab2-ring.clab.yml
-sudo containerlab destroy -t ~/labs/lab2/topology/lab2-ring.clab.yml
+sudo containerlab save -t ~/labs/topology/lab-net.clab.yml
+sudo containerlab destroy -t ~/labs/topology/lab-net.clab.yml
 ```
 
 Deactivate your virtual environment when you're done.
@@ -505,16 +536,13 @@ deactivate
 
 Confirm your repository includes, at minimum, the following, then submit as instructed by your course delivery platform:
 
-- lab3/data/vlans.yaml
-- lab3/yang/ietf-interfaces.yang, example-vlans.yang, and the schema you pulled in Task 5
-- lab3/scripts/convert_vlans.py, edit_srl1.py, nc_wrapper.sh, netconf_tool.py, devicelib.py, and your fixed devices.yaml
-- lab3/requirements.txt
-- The updated .gitignore excluding lab3/.velab3 and lab3/yang/ietf
+- lab3/data/ files
+- lab3/yang/ files
+- lab3/scripts/ files
+- requirements.txt
+- The updated .gitignore
 - Your answers to the Questions and Deliverables sections, submitted as your lab report per your instructor's separate instructions
 
-```bash
-git log --oneline --graph -10
-```
 
 \newpage
 
@@ -523,28 +551,28 @@ git log --oneline --graph -10
 ## pyang
 
 | Command | Usage |
-|---|-----|
+|---|---|
 | pyang --version | Confirm the installed pyang version |
-| pyang <file>.yang | Validate a module, silent output means no errors |
-| pyang -f tree <file>.yang | Generate an RFC 8340 style tree diagram for a module |
-| pyang -f tree <file>.yang --ignore-errors | Generate a tree even when the module has unresolved imports |
+| pyang \<file\>.yang | Validate a module, silent output means no errors |
+| pyang -f tree \<file\>.yang | Generate an RFC 8340 style tree diagram for a module |
+| pyang -f tree \<file\>.yang --ignore-errors | Generate a tree even when the module has unresolved imports |
 
 ## NETCONF Tools
 
 | Command | Usage |
-|---|-----|
+|---|---|
 | ssh -p 830 <user>@<host> -s netconf | Manually check the raw NETCONF subsystem and see the server's hello message |
-| ./nc_wrapper.sh <host> --hello | Print a device's NETCONF capabilities |
-| ./nc_wrapper.sh <host> --get-config | Retrieve the full running configuration |
-| ./nc_wrapper.sh <host> --get-config --filter <path> | Retrieve just one part of the running configuration |
-| python3 netconf_tool.py <host> capabilities | Print a device's NETCONF capabilities from Python |
-| python3 netconf_tool.py <host> modules | Print the YANG modules a device advertises |
-| python3 netconf_tool.py <host> schema <module> | Save a YANG module's schema to a local file |
+| ./nc_wrapper.sh \<host\> --hello | Print a device's NETCONF capabilities |
+| ./nc_wrapper.sh \<host\> --get-config | Retrieve the full running configuration |
+| ./nc_wrapper.sh \<host\> --get-config --filter <path> | Retrieve just one part of the running configuration |
+| python3 netconf_tool.py \<host\> capabilities | Print a device's NETCONF capabilities from Python |
+| python3 netconf_tool.py \<host\> modules | Print the YANG modules a device advertises |
+| python3 netconf_tool.py \<host\> schema <module> | Save a YANG module's schema to a local file |
 
 ## ncclient
 
 | Call | Usage |
-|---|-----|
+|---|---|
 | manager.connect(host=, port=, username=, password=, hostkey_verify=False) | Open a NETCONF session |
 | m.get_config(source="running") | Retrieve the running configuration |
 | m.edit_config(target="candidate", config=<xml>) | Apply a configuration change to the candidate datastore |
@@ -553,9 +581,8 @@ git log --oneline --graph -10
 ## Python and Virtual Environments
 
 | Command | Usage |
-|---|-----|
-| python3 -m venv .velab3 | Create a virtual environment |
-| source .velab3/bin/activate | Activate a virtual environment |
+|---|---|
+| source .velab/bin/activate | Activate a virtual environment |
 | pip install -r requirements.txt | Install packages from a pinned list |
 | pip freeze > requirements.txt | Record installed packages and their versions |
 

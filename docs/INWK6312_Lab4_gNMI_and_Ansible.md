@@ -1,24 +1,43 @@
 ---
-title: Lab 4
+title: INWK6312 - Lab 4
 subtitle: Streaming Telemetry with gNMI and Configuration Management with Ansible
 highlight-style: tango
 toc: true
+fontsize: 11pt
+numbersections: false
+colorlinks: true
+listings: true
+documentclass: article
 output:
-  pdf_document:
-    highlight: custom-tango.theme # option: tango, pygments, kate, monochrome, espresso, haddock, breezedark
-    toc_depth: 2
+    pdf_document:
+        toc_depth: 2
+        highlight: custom-tango.theme # option: tango, pygments, kate, monochrome, espresso, haddock, breezedark
 geometry: margin=1in
+
+header-includes: |
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+  \usepackage{fancyhdr}
+  \usepackage{lastpage}
+  \pagestyle{fancy}
+  \fancyhf{}
+  
+  \lhead{\title}
+  \renewcommand{\headrulewidth}{0.5pt}
+
+  \lfoot{v1.0}
+  \cfoot{\copyright\ 2026 INWK6312}
+  \rfoot{Page \thepage\ of \pageref{LastPage}}
+  \renewcommand{\headrulewidth}{0.5pt}
 ---
 
 \newpage
 
 # Introduction
 
-This lab has one running example that ties both halves together, bringing up OSPF across the whole ring, srl1's side through gNMI, ceos1 and ceos2's side through Ansible. In the first part, you will use gNMI against srl1, discovering what it supports, pulling a plain snapshot with Get, writing your own script to receive a live Subscribe stream, then configuring OSPF through the CLI you already know and adding one more piece to it, srl1's loopback, with a script of your own using gNMI Set. In the second part, you will install Ansible and use it to push configuration to ceos1 and ceos2, an interface description first, to build up the mechanics safely, then OSPF itself, a real routing change whose payoff you can verify with a ping to somewhere that wasn't reachable before.
+This configures OSPF routing across the whole network using gNMI for Nokia SR Linux node and Ansible for Arista cEOS nodes. In the first part of the lab, you will use gNMI to discover what SR Linux supports, pulling a plain snapshot with Get, writing your own script to receive a live Subscribe stream, then configuring OSPF through the CLI to add a loopback interface with a script of your own using gNMI Set. In the second part, you will install Ansible and use it to push configuration to the cEOS nodes, an interface description first, then OSPF.
 
-This lab starts by redeploying the network topology from previous labs. If Lab 2's interface configuration doesn't come back with it, redeploy and reconfigure using Lab 2 Tasks 3 and 4 before continuing.
-
-gNMI Set shows up specifically for the loopback addition in Task 7, a small, targeted change to something already running, not a way to build OSPF from nothing, that job belongs to the CLI in Task 5 and to Ansible in Task 13.
+This lab starts by redeploying the network topology from previous labs. If the nodes' configuration doesn't come back with it, redeploy and reconfigure using Lab 2 Tasks 3 and 4 before continuing.
 
 # Lab Objectives
 
@@ -40,81 +59,69 @@ By the end of this lab, you will be able to:
 
 You will need:
 
-- Your Lab 2 ring, redeployed from its saved state in Task 0
-- Your GitHub Classroom repository, cloned and up to date, now containing labs/lab1 through labs/lab3
-- Your copies of `nc_wrapper.sh`, `netconf_tool.py`, `devicelib.py`, and `devices.yaml` from `labs/lab3/scripts`
-- The tools repository, https://github.com/martimy/netconf-gnmi-tools, cloned to ~/tools
+- Your assigned Ubuntu VM IP address provided in Brightspace: ________________.
+- Your containerlab topology, redeployed from its saved state.
+- Your GitHub Classroom repository.
 
-gNMI runs on TCP port 57400 on `srl1` and 6030 on `ceos1` and `ceos2`, both enabled by default. Ansible is not installed on your VM yet, Task 0 installs it.
+gNMI runs on TCP port 57400 on `srl1` and 6030 on `ceos1` and `ceos2`, both enabled by default. Ansible is not installed on your VM yet.
 
-OSPF addressing used throughout this lab, area 0.0.0.0 throughout, single area, no need for anything more elaborate in a 3 node topology:
+OSPF addressing used throughout this lab:
 
-| Node | Router ID | Loopback |
-|---|---|---|
-| ceos1 | 10.255.0.1 | none |
-| ceos2 | 10.255.0.2 | none |
-| srl1 | 10.255.0.3 | system0, 10.255.0.3/32 |
+| Node | Router ID |
+|---|---|
+| ceos1 | 10.255.0.1 |
+| ceos2 | 10.255.0.2 |
+| srl1 | 10.255.0.3 |
 
----
+\newpage
 
 # Part A: gNMI and Streaming Telemetry
 
 ## Task 0: Environment Check and Tooling Setup
 
-Objective: bring the network topology back up, set up this lab's environment, and bring forward the tools used in Lab 3.
+Objective: bring the network topology back up, create the lab folder structure, and install required tools.
 
-1. Redeploy the ring from its saved state.
+1. Check if the network topology is still active (it shouldn't be).
 
     ```bash
-    sudo containerlab deploy -t ~/labs/lab2/topology/lab2-ring.clab.yml
-    cat /etc/hosts
+    sudo containerlab inspect -t ~/labs/topology/lab-net.clab.yml
     ```
 
-    Confirm all three nodes are running and the CLAB-lab2-ring block is present in the hosts file. Log into the devices and check if interface addressing is present. If not, reconfigure the devices using Lab 2 Tasks 3 and 4 before continuing.
+2. Redeploy the network topology from its saved state.
 
-    A faster check than logging into each node fully:
+    ```bash
+    sudo containerlab deploy -t ~/labs/topology/lab-net.clab.yml
+    ```
+
+3. Check if interface addressing is present. If not, reconfigure the devices using the Appendix below. A faster way to check is to ping:
 
     ```bash
     docker exec ceos1 ping -c 3 10.0.12.2
+    docker exec ceos1 ping -c 3 10.0.13.1
+    docker exec ceos2 ping -c 3 10.0.23.2
     ```
 
-2. Create this lab's folder structure and virtual environment.
+3. Create this lab's folder structure.
 
     ```bash
     mkdir -p ~/labs/lab4/scripts ~/labs/lab4/ansible/templates
-    cd ~/labs/lab4
-    python3 -m venv .velab4
-    source .velab4/bin/activate
     ```
 
-3. Copy forward your own already fixed tools from Lab 3, rather than re-cloning your instructor's repository and re-hitting the same devices.yaml bug you already fixed once.
+4. Activate Python's virtual environment.
 
     ```bash
-    cp ~/labs/lab3/scripts/* ~/labs/lab4/scripts/.
-    ```
-
-4. Bring in gnmi_tool.py from the tools folder.
-
-    ```bash
-    cp ~/tools/gnmi_tool.py ~/labs/lab4/scripts/
+    cd ~/labs
+    source .velab/bin/activate
     ```
 
 5. Install this lab's Python packages.
 
     ```bash
-    cd ~/labs/lab4
-    pip install -r ~/tools/requirements.txt
     pip install ansible-core
     pip freeze > requirements.txt
     ```
 
-6. Install the Ansible collection this lab needs. It is not bundled with ansible-core.
-
-    ```bash
-    ansible-galaxy collection install arista.eos
-    ```
-
-7. Confirm everything is in place.
+6. Confirm that everything needed is in place.
 
     ```bash
     python3 -c "import pygnmi; print('pygnmi ok')"
@@ -122,26 +129,32 @@ Objective: bring the network topology back up, set up this lab's environment, an
     ansible-galaxy collection list | grep eos
     ```
 
+7. If the EOS collection from step 6 is not bundled with ansible-core, install it separatly.
+
+    ```bash
+    ansible-galaxy collection install arista.eos
+    ```
+
 ### Questions and Deliverables
 
-1. Provide the output of Step 7 above.
-2. `devices.yaml` already has separate netconf and gnmi sections for each device, with different ports and different TLS related keys, `skip_verify` for `srl1`, `insecure` for `ceos1`. Why would the same device need two different sets of connection parameters for two different management protocols?
+1. Provide the output of Step 6 above.
 
-## Task 1: Discovering Capabilities and Modules with gNMI
 
-Objective: see what each device actually advertises over gNMI before assuming it matches what you saw over NETCONF in Lab 3.
+## Task 1: Discovering Supported Modules with gNMI
+
+Objective: discover what OSPF modules each device supports over gNMI.
 
 1. List `srl1`'s supported models.
 
     ```bash
-    cd ~/labs/lab4/scripts
-    python3 gnmi_tool.py srl1 modules
+    cd ~/labs/tools
+    ./gnmi_tool.py srl1 modules | grip -i ospf
     ```
 
 2. Do the same for `ceos1`.
 
     ```bash
-    python3 gnmi_tool.py ceos1 modules
+    ./gnmi_tool.py ceos1 modules | grip -i ospf
     ```
 
 3. Compare the organization field between the two outputs.
@@ -149,22 +162,22 @@ Objective: see what each device actually advertises over gNMI before assuming it
 ### Questions and Deliverables
 
 1. Provide both outputs from steps 1 and 2.
-2. Both devices advertise OpenConfig models, but look at the organization field closely. Are the two devices reporting the exact same set of modules, or does each vendor add its own on top of the shared OpenConfig baseline? Pick one example from each device to support your answer.
+2. Both devices advertise OSPF modules, but are the two devices reporting the exact same set of modules? Support your answer.
 
 ## Task 2: A Plain gNMI Get
 
 Objective: retrieve a configuration snapshot with a single Get, the gNMI equivalent of NETCONF's `get-config`, and compare the shape of the response.
 
-1. Retrieve the interfaces tree from srl1.
+1. Retrieve the interfaces tree from `srl1`.
 
     ```bash
-    python3 gnmi_tool.py srl1 config /interface
+    ./gnmi_tool.py srl1 config /interface
     ```
 
 ### Questions and Deliverables
 
 1. Provide the output.
-2. This came back as JSON, Lab 3's NETCONF `get-config` came back as XML, from the same underlying OpenConfig module. In your own words, what does that tell you about the relationship between a YANG module and the encoding used to carry it on the wire?
+2. This came back as JSON, Lab 3's NETCONF `get-config` came back as XML, from the same underlying module. What does that tell you about the relationship between a YANG module and the encoding used to carry it on the wire?
 
 ## Task 3: Streaming Telemetry in SAMPLE Mode
 
@@ -793,15 +806,15 @@ Objective: bring this lab's files into your existing repository.
 Save the running configuration on every node, then destroy the topology. The saved state needs the generated lab directory to still exist for the next lab's redeploy.
 
 ```bash
-sudo containerlab save -t ~/labs/lab2/topology/lab2-ring.clab.yml
-sudo containerlab destroy -t ~/labs/lab2/topology/lab2-ring.clab.yml
+sudo containerlab save -t ~/labs/topology/lab-net.clab.yml
+sudo containerlab destroy -t ~/labs/topology/lab-net.clab.yml
 ```
 
 If you want to confirm the save actually captured OSPF before destroying anything, `ceos1`'s and `srl1`'s saved startup configs are readable directly:
 
 ```bash
-cat ~/labs/lab2/topology/clab-lab2-ring/ceos1/flash/startup-config
-cat ~/labs/lab2/topology/clab-lab2-ring/srl1/config/config.json
+cat ~/labs/topology/clab-lab-net/ceos1/flash/startup-config
+cat ~/labs/topology/clab-lab-net/srl1/config/config.json
 ```
 
 Deactivate your virtual environment when you're done.
@@ -872,3 +885,54 @@ git log --oneline --graph -10
 |---|---|---|
 | Arista cEOS | admin | admin |
 | Nokia SR Linux | admin | NokiaSrl1! |
+
+# Appendix: Node Configuration
+
+Copy and paste the configuration below into each network node.
+
+## ceos1
+
+```
+interface Ethernet1
+   no switchport
+   ip address 10.0.12.1/30
+!
+interface Ethernet2
+   no switchport
+   ip address 10.0.13.2/30
+!
+end
+```
+
+## ceos2
+
+```
+interface Ethernet1
+   no switchport
+   ip address 10.0.12.2/30
+!
+interface Ethernet2
+   description Link to srl1
+   no switchport
+   ip address 10.0.23.1/30
+!
+end
+```
+
+## srl1
+
+<!--
+info flat | filter interface
+info flat | filter network-instance
+-->
+
+```
+set / interface ethernet-1/1 admin-state enable
+set / interface ethernet-1/1 subinterface 0 ipv4 admin-state enable
+set / interface ethernet-1/1 subinterface 0 ipv4 address 10.0.23.2/30
+set / interface ethernet-1/2 admin-state enable
+set / interface ethernet-1/2 subinterface 0 ipv4 admin-state enable
+set / interface ethernet-1/2 subinterface 0 ipv4 address 10.0.13.1/30
+set / network-instance default interface ethernet-1/1.0
+set / network-instance default interface ethernet-1/2.0
+```
