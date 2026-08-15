@@ -29,6 +29,10 @@ header-includes: |
   \cfoot{\copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
+
+  \usepackage{tcolorbox}
+  \newtcolorbox{myquote}{colback=purple!5!white, colframe=purple!75!black, arc=0mm}
+  \renewenvironment{quote}{\begin{myquote}}{\end{myquote}}
 ---
 
 \newpage
@@ -36,10 +40,6 @@ header-includes: |
 # Introduction
 
 This lab covers Docker then use Containerlab to deploy a small mixed vendor topology, two Arista cEOS nodes and one Nokia SR Linux node, connected in a ring. You will bring up Layer 3 reachability on that topology by hand, using each vendor's own CLI. In the second part of the lab, you will build an isolated Python environment and use Netmiko to talk to the Arista nodes over SSH instead of typing commands yourself, parse the CLI output you get back, and handle a connection failure with a custom exception instead of letting the script crash.
-
-<!--
-The Nokia SR Linux node is present in this lab mainly to establish the topology mechanics. You will bring its interfaces up so the topology is fully reachable, but you will not push it hard on the CLI or YANG side yet, that comes later once the course reaches NETCONF, RESTCONF, and native YANG modeling.
--->
 
 # Lab Objectives
 
@@ -66,6 +66,12 @@ You will need:
 If any of the components above are missing, check with your lab instructor before starting the lab.
 
 Containerlab operations in this lab require `sudo`, since they create network namespaces and manage Docker on your behalf. Commands that need it are shown with `sudo`, if a command does not show `sudo`, you should not need it.
+
+>## If Things Go Wrong
+>- `containerlab destroy ... --cleanup` deletes the generated `clab-<lab-name>` folder along with the containers. That is fine for the temporary single-node topologies in Task 1 and Task 2, they are meant to be thrown away. From Task 3 onward you are working with `lab-net`, the topology that carries forward into every remaining lab. Do not add `--cleanup` when destroying `lab-net`, doing so deletes any saved configuration you would otherwise recover with `containerlab deploy`.
+>- Before you type or paste a new YAML topology file, remember YAML is indentation-sensitive. If `containerlab deploy` reports a parsing error instead of a node error, check indentation first with `python3 -c "import yaml; yaml.safe_load(open('file.clab.yml'))"`, it will point at the exact line.
+>- If `git add` refuses a file with an "embedded git repository" warning, it almost always means `**/clab-*/` is missing from `.gitignore`. Add it, do not force-add the embedded repository.
+- If you damage the VM itself rather than just the lab environment, stop and contact your instructor rather than continuing to troubleshoot.
 
 \newpage
 
@@ -144,19 +150,27 @@ Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy
           image: ceos:v4.36
     ```
 
-3. Deploy it.
+3. Before deploying, check that the YAML is well formed. This matters more than it sounds like it should, YAML is indentation-sensitive and an editor's auto-indent can silently shift a line.
+
+    ```bash
+    python3 -c "import yaml; yaml.safe_load(open('test-ceos.clab.yml'))"
+    ```
+
+    >No output means the file parsed correctly. Get in the habit of running this on every topology file you hand-type or edit for the rest of the course, before you deploy it.
+
+4. Deploy it.
 
     ```bash
     sudo containerlab deploy -t test-ceos.clab.yml
     ```
 
-4. Verify it came up and note its management IP address.
+5. Verify it came up and note its management IP address.
 
     ```bash
     sudo containerlab inspect -t test-ceos.clab.yml
     ```
 
-5. Connect directly to its CLI. Containerlab names the underlying container `clab-<lab-name>-<node-name>`, so this node is `clab-test-ceos-ceos1`.
+6. Connect directly to its CLI. Containerlab names the underlying container `clab-<lab-name>-<node-name>`, so this node is `clab-test-ceos-ceos1`.
 
     ```bash
     docker exec -it clab-test-ceos-ceos1 Cli
@@ -168,7 +182,7 @@ Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy
     ssh admin@clab-test-ceos-ceos1
     ```
 
-6. From the EOS prompt, run two read only commands, then leave the CLI.
+7. From the EOS prompt, run two read only commands, then leave the CLI.
 
     ```text
     show version
@@ -176,17 +190,17 @@ Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy
     exit
     ```
 
-7. Destroy the lab, you are done with this topology.
+8. Destroy the lab, you are done with this topology.
 
     ```bash
     sudo containerlab destroy -t test-ceos.clab.yml --cleanup
     ```
 
-The local `--cleanup` flag instructs containerlab to remove the auto-generated lab directory `clab-<lab-name>` and all its content. This prevents Containerlab from reusing previous startup configuration artifacts on the next deploy. In this case, you will not need any saved information.
+>The local `--cleanup` flag instructs containerlab to remove the auto-generated lab directory `clab-<lab-name>` and all its content. This prevents Containerlab from reusing previous startup configuration artifacts on the next deploy. In this case, you will not need any saved information.
 
 ### Questions and Deliverables
 
-1. Provide the output of containerlab inspect from step 4.
+1. Provide the output of containerlab inspect from step 5.
 2. What EOS software version did show version report inside your container?
 3. Which interface did the `show interfaces` command list?
 
@@ -197,8 +211,7 @@ Objective: deploy a single SR Linux node on its own, and get a first look at how
 1. Create a second temporary topology file.
 
     ```bash
-    cd ~/labs/lab2/topology
-    nano test-srl.clab.yml
+    cd ~/labs/lab2/topology && nano test-srl.clab.yml
     ```
 
     ```yaml
@@ -211,9 +224,10 @@ Objective: deploy a single SR Linux node on its own, and get a first look at how
           type: ixr-d1
     ```
 
-2. Deploy it and inspect it.
+2. Check the YAML the same way you did in Task 1, then deploy it and inspect it.
 
     ```bash
+    python3 -c "import yaml; yaml.safe_load(open('test-srl.clab.yml'))"
     sudo containerlab deploy -t test-srl.clab.yml
     sudo containerlab inspect -t test-srl.clab.yml
     ```
@@ -256,11 +270,10 @@ Objective: combine both kinds into the persistent topology that carries forward 
 
 Three nodes connected in a ring means every node has a direct link to both of the other two, a ring of three is the same thing as a full mesh. This matters for what comes next, none of these nodes will need to forward traffic on behalf of another, unlike the router you built by hand out of namespaces in Lab 1.
 
-1. Create the real topology file.
+1. Create the real topology file. This is the topology every remaining lab in the course builds on, so it is worth careful checking.
 
     ```bash
-    cd ~/labs/lab2/topology
-    nano lab-net.clab.yml
+    cd ~/labs/lab2/topology && nano lab-net.clab.yml
     ```
 
     ```yaml
@@ -284,9 +297,10 @@ Three nodes connected in a ring means every node has a direct link to both of th
         - endpoints: ["srl1:ethernet-1/2", "ceos1:eth2"]
     ```
 
-2. Deploy it.
+2. Check the YAML, then deploy it.
 
     ```bash
+    python3 -c "import yaml; yaml.safe_load(open('lab-net.clab.yml'))"
     sudo containerlab deploy -t lab-net.clab.yml
     ```
 
@@ -506,8 +520,7 @@ Objective: connect to ceos1 over SSH using Netmiko instead of docker exec, and p
 1. Make sure your virtual environment from Task 6 is still active, then create a script in `~/labs/lab2/scripts`.
 
     ```bash
-    cd ~/labs/lab2
-    nano scripts/connect_ceos1.py
+    cd ~/labs/lab2 && nano scripts/connect_ceos1.py
     ```
 
     ```python
@@ -528,13 +541,21 @@ Objective: connect to ceos1 over SSH using Netmiko instead of docker exec, and p
 
     This code uses the node's name `ceos1`. You can also use the node's management IP address, if you prefer.
 
-2. Run it.
+2. Before running it, check for indentation or syntax problems. This matters especially if you copy-pasted the code above, pasted Python can pick up inconsistent indentation depending on your editor.
+
+    ```bash
+    python3 -m py_compile scripts/connect_ceos1.py
+    ```
+
+    >A silent return means it compiled cleanly. Make this a habit before running any script for the rest of the course, reading a compile error is much faster than debugging a confusing runtime failure caused by bad indentation.
+
+3. Run it.
 
     ```bash
     python3 scripts/connect_ceos1.py
     ```
 
-3. Verify the printed output matches what you saw directly on the CLI in Task 4, Netmiko is automating the same SSH session you could type by hand, it should show the same two interfaces and addresses.
+4. Verify the printed output matches what you saw directly on the CLI in Task 4, Netmiko is automating the same SSH session you could type by hand, it should show the same two interfaces and addresses.
 
 ### Questions and Deliverables
 
@@ -572,9 +593,10 @@ Objective: turn the raw text from Task 7 into structured data your own code can 
         print(match.group("interface"), match.group("ip"), match.group("status"))
     ```
 
-2. Run it, and confirm it prints one line per interface that has an interface name, IP address, and status, correctly split into separate fields.
+2. Check it compiles, as in Task 7, then run it and confirm it prints one line per interface that has an interface name, IP address, and status, correctly split into separate fields.
 
     ```bash
+    python3 -m py_compile scripts/parse_ceos1.py
     python3 scripts/parse_ceos1.py
     ```
 
@@ -625,9 +647,10 @@ Objective: extend the script to loop over both cEOS nodes, and make sure one unr
             continue
     ```
 
-2. Run it, and confirm both devices report correctly.
+2. Check it compiles, then run it and confirm both devices report correctly.
 
     ```bash
+    python3 -m py_compile scripts/inventory_check.py
     python3 scripts/inventory_check.py
     ```
 
@@ -670,6 +693,12 @@ Objective: Stage your changes using the global Git configuration established in 
     git push
     ```
 
+5. Tag this checkpoint.
+
+    ```bash
+    git tag lab2-complete
+    ```
+
 ### Questions and Deliverables
 
 1. Provide the output of `git status`, confirming the global `.gitignore` is protecting the repository from "dirty" commits.
@@ -685,7 +714,9 @@ sudo containerlab save -t ~/labs/lab2/topology/lab-net.clab.yml
 
 The `save` command will save the configuration files under the directory `lab2/topology/clab-lab-net`, which is not tracked by git.
 
-Destroy the topology:
+Destroy the topology.
+
+>Do NOT add `--cleanup` flag to the `destroy` command, you need configuration to persist for future labs.
 
 ```bash
 sudo containerlab destroy -t ~/labs/lab2/topology/lab-net.clab.yml

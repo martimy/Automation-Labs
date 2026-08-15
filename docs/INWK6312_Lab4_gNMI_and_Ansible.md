@@ -29,6 +29,10 @@ header-includes: |
   \cfoot{\copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
+
+  \usepackage{tcolorbox}
+  \newtcolorbox{myquote}{colback=purple!5!white, colframe=purple!75!black, arc=0mm}
+  \renewenvironment{quote}{\begin{myquote}}{\end{myquote}}
 ---
 
 \newpage
@@ -72,6 +76,12 @@ OSPF addressing used throughout this lab:
 | ceos1 | 10.255.0.1 |
 | ceos2 | 10.255.0.2 |
 | srl1 | 10.255.0.3 |
+
+>## If Things Go Wrong
+>- Never destroy `lab-net` with `--cleanup`, it deletes the saved configuration this and every later lab redeploys from.
+>- Before running a playbook, `ansible-playbook -i inventory.yml playbook.yml --syntax-check` catches YAML indentation and structural problems without touching any device. Get in the habit of running this before every new playbook.
+>- If a playbook fails with a privilege or "invalid input" style error on a task that should be simple, check `ansible_become` and `ansible_become_method` in your inventory before assuming the playbook itself is wrong.
+>- If you damage the VM itself, stop and contact your instructor rather than continuing to troubleshoot.
 
 \newpage
 
@@ -186,8 +196,7 @@ Objective: write your own script to receive a live stream of telemetry data from
 1. Create the script.
 
     ```bash
-    cd ~/labs/lab4/scripts
-    nano subscribe_sample.py
+    cd ~/labs/lab4/scripts && nano subscribe_sample.py
     ```
 
     <!-- Nokia uses Nokia Native model in this case -->
@@ -228,9 +237,10 @@ Objective: write your own script to receive a live stream of telemetry data from
 
     sample_interval is in nanoseconds, 10000000000 is 10 seconds.
 
-2. Run it, and let it collect for at least 30 seconds before stopping it with Ctrl+C.
+2. Check the script compiles, then run it and let it collect for at least 30 seconds before stopping it with Ctrl+C.
 
     ```bash
+    python3 -m py_compile subscribe_sample.py
     python3 subscribe_sample.py
     ```
 
@@ -374,8 +384,7 @@ Objective: write your own script that adds one specific piece to an already runn
 1. Using the path structure you just read in Task 6, write a script that adds `system0.0` as a new interface entry under the existing area.
 
     ```bash
-    cd ~/labs/lab4/scripts
-    nano set_ospf_loopback.py
+    cd ~/labs/lab4/scripts && nano set_ospf_loopback.py
     ```
 
     ```python
@@ -396,9 +405,10 @@ Objective: write your own script that adds one specific piece to an already runn
         print(result)
     ```
 
-2. Run it.
+2. Check it compiles, then run it.
 
     ```bash
+    python3 -m py_compile set_ospf_loopback.py
     python3 set_ospf_loopback.py
     ```
 
@@ -427,8 +437,7 @@ Objective: describe `ceos1` and `ceos2` to Ansible, including the connection det
 1. Create the inventory file (pay attention to the indentation).
 
     ```bash
-    cd  ~/labs/lab4/ansible
-    nano inventory.yml
+    cd ~/labs/lab4/ansible && nano inventory.yml
     ```
 
     ```yaml
@@ -452,7 +461,13 @@ Objective: describe `ceos1` and `ceos2` to Ansible, including the connection det
 
     The variables `ansible_become` and `ansible_become_method` tell Ansible to escalate privileges on a network device after establishing the SSH connection. Specifically, `ansible_become: true` turns on privilege escalation, while `ansible_become_method: enable` instructs Ansible to use the network-standard `enable` command rather than Linux's default `sudo`.
 
-2. Verify connectivity with an ad hoc command, before writing any playbook.
+2. Check the inventory is well formed before using it, YAML is indentation-sensitive and this file is easy to get wrong by hand.
+
+    ```bash
+    python3 -c "import yaml; yaml.safe_load(open('inventory.yml'))"
+    ```
+
+3. Verify connectivity with an ad hoc command, before writing any playbook.
 
     ```bash
     ansible -i inventory.yml ceos -m arista.eos.eos_command -a "commands='show version'"
@@ -460,9 +475,9 @@ Objective: describe `ceos1` and `ceos2` to Ansible, including the connection det
 
 ### Questions and Deliverables
 
-1. Provide the output of step 2 for both hosts.
+1. Provide the output of step 3 for both hosts.
 2. If `ansible_become` had been left out of the inventory, what specific kind of task would you expect to fail, one that only reads state, or one that changes configuration? Why?
-3. Modify the command in Task 8 Step 2 above to retrieve the routing table from devices. Provide the output. 
+3. Modify the command in Task 8 Step 3 above to retrieve the routing table from devices. Provide the output. 
 
 ## Task 9: Gathering Facts
 
@@ -488,9 +503,10 @@ Objective: use a facts module to pull structured information off both devices, a
             var: ansible_facts.net_version
     ```
 
-2. Run it.
+2. Syntax-check it, then run it.
 
     ```bash
+    ansible-playbook -i inventory.yml facts.yml --syntax-check
     ansible-playbook -i inventory.yml facts.yml
     ```
 
@@ -531,9 +547,10 @@ Objective: render a Jinja2 template and push it to both devices with a config mo
             content: "{{ lookup('ansible.builtin.template', 'templates/description.j2') }}"
     ```
 
-3. Run it.
+3. Syntax-check it, then run it.
 
     ```bash
+    ansible-playbook -i inventory.yml configure_description.yml --syntax-check
     ansible-playbook -i inventory.yml configure_description.yml
     ```
 
@@ -631,9 +648,10 @@ Objective: write an automated check that a specific piece of configuration match
             success_msg: "Compliance check passed"
     ```
 
-2. Run it, it should fail on both hosts becuase your latest description change does not match.
+2. Syntax-check it, then run it. The run should fail on both hosts because your latest description change does not match.
 
     ```bash
+    ansible-playbook -i inventory.yml compliance_check.yml --syntax-check
     ansible-playbook -i inventory.yml compliance_check.yml
     ```
 3. Confirm the play fails with your `fail_msg`, clearly naming what went wrong, rather than a generic error.
@@ -715,9 +733,10 @@ Objective: push a routing configuration and confirm with a ping that it actually
             content: "{{ lookup('ansible.builtin.template', 'templates/ospf.j2') }}"
     ```
 
-4. Run it.
+4. Syntax-check it, then run it.
 
     ```bash
+    ansible-playbook -i inventory.yml configure_ospf.yml --syntax-check
     ansible-playbook -i inventory.yml configure_ospf.yml
     ```
 
@@ -746,7 +765,7 @@ Objective: push a routing configuration and confirm with a ping that it actually
 
     Note: You can use Ansible ad hoc command in this step. Remember to specify which node you want to use, otherwise the command will be execute in all nodes in the inventory.
 
-    ```bashn
+    ```bash
     ansible -i inventory.yml ceos1 -m arista.eos.eos_command -a "commands='traceroute 10.0.23.2'"  
     ```
 
@@ -765,23 +784,29 @@ Objective: bring this lab's files into your existing repository.
     git status
     ```
 
-3. Stage and confirm what is about to be committed.
+2. Stage and confirm what is about to be committed.
 
     ```bash
     git add lab4 requirements.txt
     git status
     ```
 
-4. Commit and push.
+3. Commit and push.
 
     ```bash
     git commit -m "Add Lab 4 gNMI telemetry, gNMI Set, and Ansible OSPF automation"
     git push
     ```
 
+4. Tag this checkpoint.
+
+    ```bash
+    git tag lab4-complete
+    ```
+
 ### Questions and Deliverables
 
-1. Provide the output of `git status` from step 3.
+1. Provide the output of `git status` from step 2.
 2. Provide the output of `git log --oneline -5` after your commit.
 
 # Clean Up

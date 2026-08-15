@@ -29,6 +29,10 @@ header-includes: |
   \cfoot{\copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
+
+  \usepackage{tcolorbox}
+  \newtcolorbox{myquote}{colback=purple!5!white, colframe=purple!75!black, arc=0mm}
+  \renewenvironment{quote}{\begin{myquote}}{\end{myquote}}
 ---
 
 \newpage
@@ -60,7 +64,13 @@ You will need:
 
 If any of the components above are missing, check with your lab instructor before starting the lab.
 
-Throughout this document, commands you type are shown in code blocks. Where a command needs elevated privileges it is shown with `sudo`. If a step does not show `sudo`, you should not need it.
+> Throughout this document, commands you type are shown in code blocks. Where a command needs elevated privileges it is shown with `sudo`. If a step does not show `sudo`, you should not need it.
+
+> ## If Things Go Wrong
+>- A `cd` command that fails because of a typo will still let any command after it run, just in the wrong directory. From this lab onward, when a step chains a `cd` with the command that follows it using `&&`, keep them chained when you type or paste them, the `&&` stops the second command from running if the `cd` failed.
+>- If you damage your VM in a way you cannot undo yourself, for example deleting system files outside your home directory, stop and tell your instructor immediately rather than trying more commands. Restoring a VM from a snapshot depends on staff availability and is not instant.
+>- For anything short of that, the fastest recovery is usually to redo the current task from a clean state rather than trying to patch a half-broken one. `git status` tells you what has changed; `git restore <file>` discards unwanted edits to a tracked file.
+>- Before running any script with `sudo`, check it for obvious syntax problems first: `bash -n script.sh`. This catches leftover Git conflict markers or a stray unmatched quote before they run with elevated privileges.
 
 \newpage
 
@@ -104,8 +114,10 @@ Objective: Establish a root level directory that will serve as the single source
 2. Within this root, you will create a subfolder structure that separates lab assignments from shared utilities and network definitions.
 
     ```bash
-    mkdir -p ~/labs/lab1/scripts ~/labs/tools ~/labs/topology
+    cd ~/labs && mkdir -p lab1/scripts tools topology
     ```
+
+    > Chaining `cd` and `mkdir` with `&&` means the `mkdir` only runs if the `cd` actually succeeded. If you ever see an error on the `cd` half of a chained command, stop and fix that before continuing, do not assume the rest of the line ran correctly.
 
     The `lab1` directory will hold your specific deliverables for this module, the tools directory will house shared utilities like device libraries used across all labs, and the topology directory will store your persistent network definitions starting in Lab 2.
 
@@ -140,7 +152,7 @@ Objective: Establish a root level directory that will serve as the single source
 
 Objective: Use Linux utilities to extract and modify data within configuration files.
 
-1. Navigate to `~/labs/lab1` and create a file named `sample-config.txt` containing several interface and IP address lines (do not cut-paste the last EOF).
+1. Navigate to `~/labs/lab1` and create a file named `sample-config.txt` containing several interface and IP address lines (enter the the last EOF manually).
 
     ```bash
     cat > sample-config.txt << 'EOF'
@@ -222,6 +234,7 @@ Objective: control a service through its full lifecycle without affecting the SS
     ```
 
 3. Start the service and check its current status: 
+
     ```bash
     sudo systemctl start inwk-demo
     sudo systemctl status inwk-demo
@@ -529,7 +542,14 @@ Objective: turn the manual steps from Task 6 into repeatable scripts to avoid ma
     chmod +x teardown-topology.sh
     ```
 
-6. Run `teardown-topology.sh` to clean your environment, then run `build-topology.sh` and verify connectivity with a ping.
+6. Before running either script with `sudo`, check both for syntax errors. This costs nothing and catches a bad edit before it runs with elevated privileges rather than after.
+
+    ```bash
+    bash -n build-topology.sh
+    bash -n teardown-topology.sh
+    ```
+
+7. Run `teardown-topology.sh` to clean your environment, then run `build-topology.sh` and verify connectivity with a ping.
 
     ```bash
     sudo ./teardown-topology.sh
@@ -539,7 +559,7 @@ Objective: turn the manual steps from Task 6 into repeatable scripts to avoid ma
 ### Questions and Deliverables
 
 1. Provide the completed scripts generated on previous steps.
-2. Provide the output confirming the teardown script removed all three namespaces in step 5, and the output confirming the topology was rebuilt and reachable again in step 6.
+2. Provide the output confirming the teardown script removed all three namespaces in step 7, and the output confirming the topology was rebuilt and reachable again in the same step.
 
 \newpage
 
@@ -681,7 +701,7 @@ Objective: isolate infrastructure changes on a feature branch before merging the
 ### Questions and Deliverables
 
 1. Provide the output of git branch from step 1, confirming which branch was active.
-2. In step 5, `cat scripts/build-topology.sh` on main should not show `ns-hostC` yet. Provide that output, and explain in one sentence why the change is not visible there.
+2. In step 6, `cat scripts/build-topology.sh` on main should not show `ns-hostC` yet. Provide that output, and explain in one sentence why the change is not visible there.
 
 ## Task 11: Simulating and Resolving a Merge Conflict
 
@@ -731,7 +751,9 @@ Objective: resolve a conflict manually when two different branches modify the sa
     git merge experiment-b
     ```
 
-8. Open `lab1/scripts/build-topology.sh` and look for the conflict markers: `<<<<<<<`, `=======`, and `>>>>>>>`. Manually edit the file to keep the `10.10.21.0/24` subnet and remove all conflict markers.
+    > If you want to back out of this conflict entirely and return to how `main` looked before you attempted the merge, `git merge --abort` does that safely. You do not need this for the lab to proceed, it is worth knowing it exists for whenever you hit a conflict you did not expect.
+
+8. Open `lab1/scripts/build-topology.sh` and look for the conflict markers: `<<<<<<<`, `=======`, and `>>>>>>>`. Manually edit the file to keep the `10.10.21.0/24` subnet and remove all conflict markers. Before you stage the file, run `bash -n lab1/scripts/build-topology.sh` to confirm no conflict markers were left behind, a stray `<<<<<<<` line will not fail this check on its own, but a genuinely broken file usually will.
 9. Stage the resolved file and complete the merge commit.
 
     ```bash
@@ -803,6 +825,14 @@ Objective: connect your local repository to GitHub Classroom and complete a peer
     git pull
     ```
 
+12. Tag this point in your history as your personal checkpoint for this lab.
+
+    ```bash
+    git tag lab1-complete
+    ```
+
+    > You will do this again at the end of every lab. If something goes badly wrong in a later lab, `git reset --hard lab1-complete` (or whichever lab's tag is most recent) returns your repository to exactly this known-good state, without needing anyone's help. It does not touch your files outside the repository, and it discards any uncommitted work in the repository itself, so use it when you want a clean restart, not as a routine undo.
+
 <!--
 ### Questions and Deliverables
 
@@ -835,9 +865,9 @@ Part B: Git and Environment Management
 
 # Clean Up
 
-You should leave the `inwk-demo` systemd service running as it is a harmless background process. You may leave your namespace topology active or use your `teardown-topology.sh` script to remove it, as the scripts allow you to rebuild the infrastructure at any time.
+You could leave the `inwk-demo` systemd service running as it is a harmless background process. You may leave your namespace topology active or use your `teardown-topology.sh` script to remove it, as the scripts allow you to rebuild the infrastructure at any time.
 
-Do not delete the `.velab` directory or your `.gitignore` file, as these are central to the unified environment you will use for the rest of the course. Do not delete your GitHub Classroom repository, as you will continue to extend this same repository in Lab 2 and beyond.
+> Do NOT delete the `.velab` directory or your `.gitignore` file, as these are central to the unified environment you will use for the rest of the course. Do NOT delete your GitHub Classroom repository, as you will continue to extend this same repository in Lab 2 and beyond.
 
 # Submission
 

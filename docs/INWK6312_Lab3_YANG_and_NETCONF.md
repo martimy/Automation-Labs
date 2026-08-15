@@ -29,6 +29,10 @@ header-includes: |
   \cfoot{\copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
+
+  \usepackage{tcolorbox}
+  \newtcolorbox{myquote}{colback=purple!5!white, colframe=purple!75!black, arc=0mm}
+  \renewenvironment{quote}{\begin{myquote}}{\end{myquote}}
 ---
 
 \newpage
@@ -61,6 +65,12 @@ You will need:
 
 NETCONF runs on TCP port 830 on both cEOS and SR Linux in this topology, and both come with it enabled by default.
 
+>## If Things Go Wrong
+>- Never destroy `lab-net` with `--cleanup`. It deletes the saved configuration folder this lab's Task 0 relies on, and everything from Lab 2 onward would need to be reconfigured by hand.
+>- If `pyang` reports an error you did not expect on a file you did not intend to change, check for stray whitespace or a missing closing brace introduced by copy-paste, not just the logic of the module itself.
+>- If `ncclient` raises an XML or namespace related error, check the namespace (`xmlns=`) in your payload against the real payload you pulled from the device in Task 6, do not assume a namespace from a different vendor or a different lab applies here.
+>- If you damage the VM itself, stop and contact your instructor rather than continuing to troubleshoot.
+
 \newpage
 
 # Part A: Data Formats and YANG, Off the Device
@@ -92,15 +102,13 @@ Objective: Copy and start the topology created in Lab2, set up this lab's folder
 4. Clone the tools repository outside this lab's repository to keep them separate. These tools will be used in this and future labs.
 
     ```bash
-    cd ~
-    git clone https://github.com/martimy/Automation-Labs tools
+    cd ~ && git clone https://github.com/martimy/Automation-Labs tools
     ```
 
     <!--future -->
 
     ```bash
-    cd ~
-    git clone -b tools --single-branch --depth=1 https://github.com/martimy/Automation-Labs tools
+    cd ~ && git clone -b tools --single-branch --depth=1 https://github.com/martimy/Automation-Labs tools
     ```
 
 5. Copy the tools into your own labs/tools folder and confirm that `nc_wrapper.sh` is executable.
@@ -200,8 +208,7 @@ Objective: use `pyang` to visualize the standard ietf-interfaces module and iden
 1. Download the module.
 
     ```bash
-    cd ~/labs/lab3/yang   
-    git clone https://github.com/YangModels/yang ietf
+    cd ~/labs/lab3/yang && git clone https://github.com/YangModels/yang ietf
     cp ietf/standard/ietf/RFC/ietf-interfaces.yang .
     ```
 
@@ -232,8 +239,7 @@ Objective: use `pyang` to catch structural and syntax errors in a small module.
 1. Create the following file exactly as shown, it has two deliberate errors in it.
 
     ```bash
-    cd ~/labs/lab3/yang
-    nano example-vlans.yang
+    cd ~/labs/lab3/yang && nano example-vlans.yang
     ```
 
     ```yang
@@ -421,8 +427,7 @@ Objective: write a short `ncclient` script that edits and commits a configuratio
 2. Create the script, and paste your adapted element into the `config_snippet` variable. Add a new description `<description>Link to ceos2</description>` in similar location as the output of Step 3 in Task 6.
 
     ```bash
-    cd ~/labs/lab3/scripts
-    nano edit_srl1.py
+    cd ~/labs/lab3/scripts && nano edit_srl1.py
     ```
 
     ```python
@@ -457,9 +462,10 @@ Objective: write a short `ncclient` script that edits and commits a configuratio
         print("Change committed")
     ```
 
-3. Run it.
+3. Check it compiles, as you did in Lab 2, then run it.
 
     ```bash
+    python3 -m py_compile edit_srl1.py
     python3 edit_srl1.py
     ```
 
@@ -510,6 +516,12 @@ Objective: bring this lab's files into your existing repository, excluding the d
     ```bash
     git commit -m "Add Lab 3 YANG and NETCONF work"
     git push
+    ```
+
+5. Tag this checkpoint.
+
+    ```bash
+    git tag lab3-complete
     ```
 
 ### Questions and Deliverables

@@ -29,6 +29,10 @@ header-includes: |
   \cfoot{\copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
+
+  \usepackage{tcolorbox}
+  \newtcolorbox{myquote}{colback=purple!5!white, colframe=purple!75!black, arc=0mm}
+  \renewenvironment{quote}{\begin{myquote}}{\end{myquote}}
 ---
 
 \newpage
@@ -71,6 +75,14 @@ Addressing used in this lab, extending what previous labs already established:
 | ceos1 to host1 | host1 : eth1 | 10.0.100.2/24 |
 | ceos2 to host2 | ceos2 : Ethernet3 | 10.0.200.1/24 |
 | ceos2 to host2 | host2 : eth1 | 10.0.200.2/24 |
+
+>## If Things Go Wrong
+>- Never destroy `lab-net` with `--cleanup`, it deletes the saved configuration every lab in this course, including this one, depends on.
+>- The `.env` file holds your NetBox API token. Confirm it is actually excluded by `git status` before every commit in this lab, do not assume `.gitignore` is correct just because it worked in earlier labs.
+>- Before running an Ansible playbook, syntax-check it first: `ansible-playbook -i <inventory> <playbook>.yml --syntax-check`.
+>- Before hand-editing a saved device configuration file like `ceos1.cfg`, make a copy first (`cp ceos1.cfg ceos1.cfg.bak`). A single bad edit to a full running-config dump can break Batfish's parse for the whole snapshot, not just the line you meant to change, and the resulting error message will not point you back to your edit.
+>- If a Docker container name is already in use, for example a second attempt to start Batfish or NetBox after a mistake, remove the old one before retrying: `docker rm -f batfish`.
+>- If you damage the VM itself, stop and contact your instructor rather than continuing to troubleshoot.
 
 \newpage
 
@@ -139,8 +151,7 @@ Objective: model the network nodes in NetBox using Python's `pynetbox`.
 1. Create the data file below. Two nodes are included, you need to add the third node, `srl1`, following the same pattern.
 
     ```bash
-    cd ~/labs/lab5
-    nano scripts/netbox_data.yaml
+    cd ~/labs/lab5 && nano scripts/netbox_data.yaml
     ```
 
     ```yaml
@@ -296,18 +307,25 @@ Objective: model the network nodes in NetBox using Python's `pynetbox`.
         )
     ```
 
-4. Run the script.
+4. Check both files before running anything. `netbox_data.yaml` is hand-edited YAML, and `populate_netbox.py` is a new script, both are worth a quick check first.
+
+    ```bash
+    python3 -c "import yaml; yaml.safe_load(open('scripts/netbox_data.yaml'))"
+    python3 -m py_compile scripts/populate_netbox.py
+    ```
+
+5. Run the script.
 
     ```bash
     python3 scripts/populate_netbox.py scripts/netbox_data.yaml
     ```
 
-5. Look at the result in the web UI and confirm that devices, interfaces, and addresses are there. Spend time looking around and discovering NetBox, you won't be using the UI in this lab except for checking.
+6. Look at the result in the web UI and confirm that devices, interfaces, and addresses are there. Spend time looking around and discovering NetBox, you won't be using the UI in this lab except for checking.
 
 ### Questions and Deliverables
 
 1. Provide your completed `netbox_data.yaml`.
-2. Provide a screenshot or the text content of one device's interface list from the web UI, confirming step 5.
+2. Provide a screenshot or the text content of one device's interface list from the web UI, confirming step 6.
 
 ## Task 2: Querying NetBox over REST and GraphQL
 
@@ -408,8 +426,7 @@ Objective: extend NetBox data to cover the added nodes, keeping the source of tr
 1. Extend `netbox_data.yaml` by adding entries for `host1` and `host2`, plus the two new router interfaces, `Ethernet3` on both `ceos1` and `ceos2`.
 
     ```bash
-    cd ~/labs/lab5
-    nano scripts/netbox_data.yaml
+    cd ~/labs/lab5 && nano scripts/netbox_data.yaml
     ```
 
     Add a manufacturer, a role, and a device type for the hosts:
@@ -447,8 +464,7 @@ Objective: use the source of truth to drive automation.
 1. Create an Ansible playbook that queries NetBox for each host's Ethernet3 address rather than having that address typed into a template variable anywhere.
 
     ```bash
-    cd ~/labs/lab5
-    nano ansible/configure_hosts_interface.yml
+    cd ~/labs/lab5 && nano ansible/configure_hosts_interface.yml
     ```
 
     ```yaml
@@ -494,9 +510,10 @@ Objective: use the source of truth to drive automation.
 
    <!-- Space is needed for "Ethernet 3", so do not remove it -->
    
-2. Use the Ansible inventory from Lab4 to run the playbook.
+2. Use the Ansible inventory from Lab4 to syntax-check, then run the playbook.
 
     ```bash
+    ansible-playbook -i ~/labs/lab4/ansible/inventory.yml ansible/configure_hosts_interface.yml --syntax-check
     ansible-playbook -i ~/labs/lab4/ansible/inventory.yml ansible/configure_hosts_interface.yml
     ```
 
@@ -550,8 +567,7 @@ Objective: reuse gNMI subscribe script from Lab 4 to report telemetry from `ceos
 1. Copy `subscribe_sample.py` from Lab 4 and change the node to `ceos1` and the path.
 
     ```bash
-    cd ~/labs/lab5/scripts
-    cp ~/labs/lab4/scripts/subscribe_sample.py subscribe_ceos_traffic.py
+    cd ~/labs/lab5/scripts && cp ~/labs/lab4/scripts/subscribe_sample.py subscribe_ceos_traffic.py
     nano subscribe_ceos_traffic.py
     ```
 
@@ -583,9 +599,10 @@ Objective: reuse gNMI subscribe script from Lab 4 to report telemetry from `ceos
 
     This watches Ethernet3, `ceos1`'s link to `host1` which is generating the traffic towards `host2`.
 
-2. Start the script, then in a second terminal, run another iperf3 test while it's running.
+2. Check it compiles, then start the script, and in a second terminal, run another iperf3 test while it's running.
 
     ```bash
+    python3 -m py_compile subscribe_ceos_traffic.py
     python3 subscribe_ceos_traffic.py
     ```
 
@@ -618,8 +635,7 @@ Objective: write verification tasks that check live state against what you expec
 1. Create the playbook.
 
     ```bash
-    cd ~/labs/lab5
-    nano ansible/verify_network.yml
+    cd ~/labs/lab5 && nano ansible/verify_network.yml
     ```
 
     ```yaml
@@ -642,9 +658,10 @@ Objective: write verification tasks that check live state against what you expec
             success_msg: "OSPF adjacency confirmed"
     ```
 
-2. Run it.
+2. Syntax-check it, then run it.
 
     ```bash
+    ansible-playbook -i ~/labs/lab4/ansible/inventory.yml ansible/verify_network.yml --syntax-check
     ansible-playbook -i ~/labs/lab4/ansible/inventory.yml ansible/verify_network.yml
     ```
 
@@ -659,7 +676,7 @@ Objective: add NTP configuration to cEOS nodes. Before touching the production n
 
 Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only covers `ceos1` and `ceos2`.
 
-1. Start Batfish, its Docker image has already been pulled into your machine.
+1. Start Batfish, its Docker image has already been pulled into your machine. If a container named `batfish` already exists from an earlier attempt, remove it first: `docker rm -f batfish`.
 
     ```bash
     cd ~/labs
@@ -696,11 +713,21 @@ Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only
             dest: "/home/student/labs/lab5/checks/ceos/configs/{{ inventory_hostname }}.cfg"
     ```
 
+    Syntax-check it, then run it.
+
     ```bash
+    ansible-playbook -i ~/labs/lab4/ansible/inventory.yml ~/labs/lab5/ansible/backup_configs.yml --syntax-check
     ansible-playbook -i ~/labs/lab4/ansible/inventory.yml ~/labs/lab5/ansible/backup_configs.yml
     ```
 
-3. Edit `ceos1`'s configuration file to add NTP near the end of the file, then save.
+3. Before editing, make a backup copy of each config file, a bad edit here can break Batfish's parse for the whole snapshot, and having the original to diff against or fall back to is worth the ten seconds.
+
+    ```bash
+    cp ~/labs/lab5/checks/ceos/configs/ceos1.cfg ~/labs/lab5/checks/ceos/configs/ceos1.cfg.bak
+    cp ~/labs/lab5/checks/ceos/configs/ceos2.cfg ~/labs/lab5/checks/ceos/configs/ceos2.cfg.bak
+    ```
+
+4. Edit `ceos1`'s configuration file to add NTP near the end of the file, then save.
 
     ```bash
     nano ~/labs/lab5/checks/ceos/configs/ceos1.cfg
@@ -712,7 +739,7 @@ Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only
     end
     ```
 
-4. Repeat for `ceos2`, but use a different (incorrect) server.
+5. Repeat for `ceos2`, but use a different (incorrect) server.
 
     ```text
     !
@@ -721,7 +748,7 @@ Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only
     ```
 
 
-5. Write the check. This confirms NTP is configured, the server IP address is among an approved list of servers, and the server is reachable.
+6. Write the check. This confirms NTP is configured, the server IP address is among an approved list of servers, and the server is reachable.
 
     ```bash
     nano ~/labs/lab5/checks/batfish_ntp_check.py
@@ -801,16 +828,15 @@ Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only
         raise SystemExit(1)
     ```
 
-6. Run it. The check should fail because server `1.1.1.1` is not among the approved servers.
+7. Run it. The check should fail because server `1.1.1.1` is not among the approved servers.
 
     ```bash
-    cd ~/labs/lab5/checks
-    python3 batfish_ntp_check.py
+    cd ~/labs/lab5/checks && python3 batfish_ntp_check.py
     ```
 
 ### Questions and Deliverables
 
-1. Provide the output of step 4, showing a check failure due to ceos2's unapproved NTP server.
+1. Provide the output of step 7, showing a check failure due to ceos2's unapproved NTP server.
 2. The reachability check confirms Batfish's model routes NTP traffic toward 172.20.20.1's subnet. What could this check miss that only testing against the live network could catch?
 
 ## Task 10: Wrapping It in GitHub Actions
@@ -820,8 +846,7 @@ Objective: run the checks from Task 9 automatically whenever configuration work 
 1. Create the workflow file in your repository.
 
     ```bash
-    cd ~/labs
-    mkdir -p ~/labs/.github/workflows
+    cd ~/labs && mkdir -p ~/labs/.github/workflows
     nano ~/labs/.github/workflows/config-check.yml
     ```
 
@@ -868,7 +893,13 @@ Objective: run the checks from Task 9 automatically whenever configuration work 
             working-directory: lab5/checks
     ```
 
-2. Commit and push just this file, then confirm it actually caught nothing to run yet, this workflow only triggers on changes under lab5/checks.
+2. Check this file's YAML is well formed before committing it, a bad indent here fails silently until GitHub tries to run it.
+
+    ```bash
+    python3 -c "import yaml; yaml.safe_load(open('.github/workflows/config-check.yml'))"
+    ```
+
+3. Commit and push just this file, then confirm it actually caught nothing to run yet, this workflow only triggers on changes under lab5/checks.
 
     GitHub won't accept a push that adds or modifies a file under .github/workflows/ using a token that only has repo scope, the scope Lab 1 had you create. It requires a token with the workflow scope specifically. Check your token's scopes on GitHub under Settings, Developer settings, Personal access tokens, and add workflow if it isn't already there, or generate a new token with both scopes and use that instead.
 
@@ -879,7 +910,7 @@ Objective: run the checks from Task 9 automatically whenever configuration work 
     git push
     ```
 
-3. Add the checks folder, then commit and push. `ceos2.cfg` is still carrying the deliberate error from Task 9, so this push should trigger a failing run.
+4. Add the checks folder, then commit and push. `ceos2.cfg` is still carrying the deliberate error from Task 9, so this push should trigger a failing run.
 
     ```bash
     git add lab5/checks/
@@ -887,8 +918,8 @@ Objective: run the checks from Task 9 automatically whenever configuration work 
     git push
     ```
 
-4. Confirm the Actions tab shows a failed run this time, and that the log names the actual reason, no overlapping reference NTP servers found.
-5. Change the server IP to "172.20.20.1" in `ceos2`, then repeat step 3 and confirm that the check passes.
+5. Confirm the Actions tab shows a failed run this time, and that the log names the actual reason, no overlapping reference NTP servers found.
+6. Change the server IP to "172.20.20.1" in `ceos2`, then repeat step 4 and confirm that the check passes.
 
 ### Questions and Deliverables
 
@@ -902,8 +933,7 @@ Objective: bring the rest of this lab's files into your repository.
 1. Move to the root of your repository.
 
     ```bash
-    cd ~/labs
-    git status
+    cd ~/labs && git status
     ```
 
 2. Stage and confirm what is about to be committed.
@@ -918,6 +948,12 @@ Objective: bring the rest of this lab's files into your repository.
     ```bash
     git commit -m "Add Lab 5, NetBox source of truth, real traffic telemetry, and CI/CD pipeline"
     git push
+    ```
+
+4. Tag this checkpoint, the last one for the course.
+
+    ```bash
+    git tag lab5-complete
     ```
 
 ### Questions and Deliverables
