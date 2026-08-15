@@ -319,7 +319,7 @@ Three nodes connected in a ring means every node has a direct link to both of th
 ### Questions and Deliverables
 
 1. Provide the output of containerlab `inspect -t lab-net.clab.yml`.
-2. What does specifying a kind actually control in containerlab toplogy file?
+2. What does specifying a kind actually control in containerlab topology file?
 3. Explain why the node names do not include the lab name prefix.
 
 ## Task 4: Configuring Layer 3 Reachability

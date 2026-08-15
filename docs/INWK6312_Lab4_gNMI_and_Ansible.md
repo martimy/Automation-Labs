@@ -93,35 +93,35 @@ Objective: bring the network topology back up, create the lab folder structure, 
     sudo containerlab deploy -t ~/labs/topology/lab-net.clab.yml
     ```
 
-3. Check if interface addressing is present. If not, reconfigure the devices using the Appendix below. A faster way to check is to ping:
+3. Check if interface addressing is present. If not, reconfigure the devices using the Appendix below. A faster way to check is to ping.
 
     ```bash
-    docker exec ceos1 ping -c 3 10.0.12.2
-    docker exec ceos1 ping -c 3 10.0.13.1
-    docker exec ceos2 ping -c 3 10.0.23.2
+    docker exec -it ceos1 Cli -c "ping 10.0.12.2"
+    docker exec -it ceos1 Cli -c "ping 10.0.13.1"
+    docker exec -it ceos2 Cli -c "ping 10.0.23.2"
     ```
 
-3. Create this lab's folder structure.
+4. Create this lab's folder structure.
 
     ```bash
     mkdir -p ~/labs/lab4/scripts ~/labs/lab4/ansible/templates
     ```
 
-4. Activate Python's virtual environment.
+5. Activate Python's virtual environment.
 
     ```bash
     cd ~/labs
     source .velab/bin/activate
     ```
 
-5. Install this lab's Python packages.
+6. Install this lab's Python packages.
 
     ```bash
     pip install ansible-core
     pip freeze > requirements.txt
     ```
 
-6. Confirm that everything needed is in place.
+7. Confirm that everything needed is in place.
 
     ```bash
     python3 -c "import pygnmi; print('pygnmi ok')"
@@ -129,7 +129,7 @@ Objective: bring the network topology back up, create the lab folder structure, 
     ansible-galaxy collection list | grep eos
     ```
 
-7. If the EOS collection from step 6 is not bundled with ansible-core, install it separatly.
+8. If the EOS collection from step 6 is not bundled with ansible-core, install it separately.
 
     ```bash
     ansible-galaxy collection install arista.eos
@@ -137,7 +137,7 @@ Objective: bring the network topology back up, create the lab folder structure, 
 
 ### Questions and Deliverables
 
-1. Provide the output of Step 6 above.
+1. Provide the output of Step 7 above.
 
 
 ## Task 1: Discovering Supported Modules with gNMI
@@ -148,13 +148,13 @@ Objective: discover what OSPF modules each device supports over gNMI.
 
     ```bash
     cd ~/labs/tools
-    ./gnmi_tool.py srl1 modules | grip -i ospf
+    ./gnmi_tool.py srl1 modules | grep -i ospf
     ```
 
 2. Do the same for `ceos1`.
 
     ```bash
-    ./gnmi_tool.py ceos1 modules | grip -i ospf
+    ./gnmi_tool.py ceos1 modules | grep -i ospf
     ```
 
 3. Compare the organization field between the two outputs.
@@ -186,7 +186,8 @@ Objective: write your own script to receive a live stream of telemetry data from
 1. Create the script.
 
     ```bash
-    nano ~/labs/lab4/scripts/subscribe_sample.py
+    cd ~/labs/lab4/scripts
+    nano subscribe_sample.py
     ```
 
     <!-- Nokia uses Nokia Native model in this case -->
@@ -195,6 +196,11 @@ Objective: write your own script to receive a live stream of telemetry data from
     the configuration  -->
 
     ```python
+    import sys
+    import os
+    # Needed to import devicelib    
+    sys.path.append(os.path.expanduser("~/labs/tools"))
+
     import json
     from pygnmi.client import gNMIclient, telemetryParser
     from devicelib import load_devices
@@ -225,7 +231,6 @@ Objective: write your own script to receive a live stream of telemetry data from
 2. Run it, and let it collect for at least 30 seconds before stopping it with Ctrl+C.
 
     ```bash
-    cd ~/labs/lab4/scripts
     python3 subscribe_sample.py
     ```
 
@@ -281,14 +286,13 @@ Objective: subscribe to the same counter from Task 3, but in `ON_CHANGE` mode, i
     ```
 
     ```text
-    enable
     ping 10.0.23.2
     ```
 
-    or
+    or via Docker.
 
     ```bash
-    docker exec ceos2 ping 10.0.23.2 -c 5
+    docker exec -it ceos2 Cli -c "ping 10.0.23.2"
     ```
 
 4. Watch your `subscribe_onchange.py` terminal, an update should arrive while the ping is running.
@@ -307,7 +311,7 @@ Note: in this network, there is virtually no traffic across the link except for 
 
 ## Task 5: Bringing Up OSPF on srl1
 
-Objective: configure OSPF on `srl1` through the CLI you already know, the same technique Lab 3 used, CLI first, so there's a real payload to read back before anything gets scripted.
+Objective: configure OSPF on `srl1` through the CLI.
 
 1. Connect and apply the configuration. This does two things, addresses `srl1`'s loopback, `system0`, and brings up an OSPF process on the two data links.
 
@@ -326,6 +330,11 @@ Objective: configure OSPF on `srl1` through the CLI you already know, the same t
     set / network-instance default protocols ospf instance 100 router-id 10.255.0.3
     set / network-instance default protocols ospf instance 100 area 0.0.0.0 interface ethernet-1/1.0 admin-state enable
     set / network-instance default protocols ospf instance 100 area 0.0.0.0 interface ethernet-1/2.0 admin-state enable
+    ```
+
+    Check the confiuration then commit.
+
+    ```bash
     diff
     commit now
     quit
@@ -342,33 +351,37 @@ Objective: configure OSPF on `srl1` through the CLI you already know, the same t
 
 ## Task 6: Reading Back OSPF Configuration with gNMI
 
-Objective: confirm the CLI change landed the way you expect, and see which YANG module actually owns OSPF configuration on srl1.
+Objective: confirm the CLI change and see which YANG module actually owns OSPF configuration on `srl1`.
 
 1. Query srl1's OSPF configuration.
 
     ```bash
-    cd ~/labs/lab4/scripts
-    python3 gnmi_tool.py srl1 config /network-instance[name=default]/protocols/ospf
+    cd ~/labs/tools
+    ./gnmi_tool.py srl1 config /network-instance[name=default]/protocols/ospf
     ```
 
-2. Look at the module name in the returned path, not just the values underneath it.
+2. Look at the module name in the returned path and the values underneath it.
 
 ### Questions and Deliverables
 
 1. Provide the output of step 1.
-2. Task 2 read interfaces configuration and saw the openconfig-interfaces module. What module owns this OSPF configuration instead? Does that match what you found when you compared organization fields back in Task 1?
+2. What YANG model is used for OSPF configuration?
 
 ## Task 7: Adding the Loopback to OSPF with gNMI Set
 
-Objective: write your own script that adds one specific piece to an already running configuration, rather than rebuilding it from scratch, the same restraint Lab 3's `edit_srl1.py` showed.
+Objective: write your own script that adds one specific piece to an already running configuration.
 
 1. Using the path structure you just read in Task 6, write a script that adds `system0.0` as a new interface entry under the existing area.
 
     ```bash
-    nano ~/labs/lab4/scripts/set_ospf_loopback.py
+    cd ~/labs/lab4/scripts
+    nano set_ospf_loopback.py
     ```
 
     ```python
+    import sys
+    import os
+    sys.path.append(os.path.expanduser("~/labs/tools"))
     from pygnmi.client import gNMIclient
     from devicelib import load_devices
 
@@ -389,13 +402,13 @@ Objective: write your own script that adds one specific piece to an already runn
     python3 set_ospf_loopback.py
     ```
 
-3. Confirm it landed, using the same Get from Task 6.
+3. Confirm the change is successfull using the same Get from Task 6.
 
     ```bash
-    python3 gnmi_tool.py srl1 config /network-instance[name=default]/protocols/ospf
+    ~/labs/tools/gnmi_tool.py srl1 config /network-instance[name=default]/protocols/ospf
     ```
 
-    The area's interface list should now show three entries instead of two.
+    The area 0.0.0.0's interface list should now show three entries instead of two.
 
 ### Questions and Deliverables
 
@@ -414,7 +427,8 @@ Objective: describe `ceos1` and `ceos2` to Ansible, including the connection det
 1. Create the inventory file (pay attention to the indentation).
 
     ```bash
-    nano ~/labs/lab4/ansible/inventory.yml
+    cd  ~/labs/lab4/ansible
+    nano inventory.yml
     ```
 
     ```yaml
@@ -433,15 +447,15 @@ Objective: describe `ceos1` and `ceos2` to Ansible, including the connection det
             ansible_password: admin
             ansible_become: true
             ansible_become_method: enable
+            ansible_ssh_extra_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
     ```
 
-    The variables `ansible_become` and `ansible_become_method` matter here for a specific reason, not a generic best practice, your admin account lands below configuration privilege when it logs in, exactly like Task 4 of Lab 3 needed an explicit enable before configure would work. Ansible needs to be told to do the same thing on your behalf.
+    The variables `ansible_become` and `ansible_become_method` tell Ansible to escalate privileges on a network device after establishing the SSH connection. Specifically, `ansible_become: true` turns on privilege escalation, while `ansible_become_method: enable` instructs Ansible to use the network-standard `enable` command rather than Linux's default `sudo`.
 
 2. Verify connectivity with an ad hoc command, before writing any playbook.
 
     ```bash
-    cd ~/labs/lab4
-    ansible -i ansible/inventory.yml ceos -m arista.eos.eos_command -a "commands='show version'"
+    ansible -i inventory.yml ceos -m arista.eos.eos_command -a "commands='show version'"
     ```
 
 ### Questions and Deliverables
@@ -457,7 +471,7 @@ Objective: use a facts module to pull structured information off both devices, a
 1. Create the playbook.
 
     ```bash
-    nano ~/labs/lab4/ansible/facts.yml
+    nano facts.yml
     ```
 
     ```yaml
@@ -477,7 +491,7 @@ Objective: use a facts module to pull structured information off both devices, a
 2. Run it.
 
     ```bash
-    ansible-playbook -i ansible/inventory.yml ansible/facts.yml
+    ansible-playbook -i inventory.yml facts.yml
     ```
 
 ### Questions and Deliverables
@@ -492,7 +506,7 @@ Objective: render a Jinja2 template and push it to both devices with a config mo
 1. Create the template. Both ceos1 and ceos2 reach srl1 over their own Ethernet2, so the same template applies to both hosts unchanged.
 
     ```bash
-    nano ~/labs/lab4/ansible/templates/description.j2
+    nano templates/description.j2
     ```
 
     ```jinja
@@ -503,7 +517,7 @@ Objective: render a Jinja2 template and push it to both devices with a config mo
 2. Create the playbook to push a rendered template.
 
     ```bash
-    nano ~/labs/lab4/ansible/configure_description.yml
+    nano configure_description.yml
     ```
 
     ```yaml
@@ -520,19 +534,15 @@ Objective: render a Jinja2 template and push it to both devices with a config mo
 3. Run it.
 
     ```bash
-    ansible-playbook -i ansible/inventory.yml ansible/configure_description.yml
+    ansible-playbook -i inventory.yml configure_description.yml
     ```
 
     Both hosts should report changed.
 
-4. Verify directly on the device, not just by trusting Ansible's output.
+4. Verify the change using an ad hoc command.
 
     ```bash
-    ssh admin@ceos1
-    ```
-
-    ```text
-    show interfaces description
+    ansible -i inventory.yml ceos -m arista.eos.eos_command -a "commands='show interface description'"
     ```
 
     Repeat for ceos2.
@@ -540,16 +550,16 @@ Objective: render a Jinja2 template and push it to both devices with a config mo
 ### Questions and Deliverables
 
 1. Provide the playbook run output from step 3, showing changed for both hosts.
-2. Provide the show interfaces description output from both hosts in step 4, confirming the description landed.
+2. Provide the show interfaces description output from both hosts in step 4, confirming the configuration change.
 
 ## Task 11: Idempotency and Check Mode
 
-Objective: confirm two specific claims from Lecture 8 against your own devices, that a second identical run does nothing, and that check mode shows you a change before it happens.
+Objective: confirm that a second identical run does nothing, and that check mode shows you a change before it happens.
 
 1. Run the exact same playbook from Task 10 again, with no changes to the template.
 
     ```bash
-    ansible-playbook -i ansible/inventory.yml ansible/configure_description.yml
+    ansible-playbook -i inventory.yml configure_description.yml
     ```
 
     This time both hosts should report ok, not changed. Nothing was different on the device, so Ansible had nothing to do.
@@ -557,34 +567,30 @@ Objective: confirm two specific claims from Lecture 8 against your own devices, 
 2. Now change the template's description text.
 
     ```bash
-    nano ~/labs/lab4/ansible/templates/description.j2
+    nano templates/description.j2
     ```
 
     ```jinja
     interface Ethernet2
-       description Link to srl1, verified in Lab 4
+       description Link to Another Node
     ```
 
 3. Preview the change without applying it.
 
     ```bash
-    ansible-playbook -i ansible/inventory.yml ansible/configure_description.yml --check --diff
+    ansible-playbook -i inventory.yml configure_description.yml --check --diff
     ```
 
 4. Confirm on the device that nothing actually changed yet.
 
     ```bash
-    ssh admin@ceos1
+    ansible -i inventory.yml ceos -m arista.eos.eos_command -a "commands='show interface description'"
     ```
 
-    ```text
-    show interfaces description
-    ```
-
-5. Apply the change for real.
+5. Apply the change.
 
     ```bash
-    ansible-playbook -i ansible/inventory.yml ansible/configure_description.yml
+    ansible-playbook -i inventory.yml configure_description.yml
     ```
 
 ### Questions and Deliverables
@@ -600,7 +606,7 @@ Objective: write an automated check that a specific piece of configuration match
 1. Create the playbook.
 
     ```bash
-    nano ~/labs/lab4/ansible/compliance_check.yml
+    nano compliance_check.yml
     ```
 
     ```yaml
@@ -609,7 +615,7 @@ Objective: write an automated check that a specific piece of configuration match
       hosts: ceos
       gather_facts: false
       vars:
-        expected_description: "Link to srl1, verified in Lab 4"
+        expected_description: "Link to srl1"
       tasks:
         - name: Retrieve current interface description
           arista.eos.eos_command:
@@ -625,39 +631,31 @@ Objective: write an automated check that a specific piece of configuration match
             success_msg: "Compliance check passed"
     ```
 
-2. Run it, it should pass on both hosts.
+2. Run it, it should fail on both hosts becuase your latest description change does not match.
 
     ```bash
-    ansible-playbook -i ansible/inventory.yml ansible/compliance_check.yml
+    ansible-playbook -i inventory.yml compliance_check.yml
     ```
+3. Confirm the play fails with your `fail_msg`, clearly naming what went wrong, rather than a generic error.
 
-3. Now deliberately break it, change `expected_description` to something that no longer matches, and run it again.
+4. Restore the interface descriptions to "Link to srl1" either manually or using Ansible as in Task 11.
 
-    ```bash
-    nano ~/labs/lab4/ansible/compliance_check.yml
-    ```
+5. Run the compliance check again. It should pass.
 
-    ```bash
-    ansible-playbook -i ansible/inventory.yml ansible/compliance_check.yml
-    ```
-
-4. Confirm the play fails with your `fail_msg`, clearly naming what went wrong, rather than a generic error.
-
-5. Restore expected_description to the correct value before moving on.
 
 ### Questions and Deliverables
 
-1. Provide the passing output from step 2 and the failing output from step 3.
+1. Provide the failing output from step 2 and the passing output from step 4.
 2. Why is a check like this, run automatically after every change, more reliable than a person periodically reading through show run by eye?
 
 ## Task 13: Enabling OSPF with Ansible
 
 Objective: push a routing configuration and confirm with a ping that it actually changed what each device can reach.
 
-1. Add a `router_id` to each host in your inventory.
+1. Add a `router_id` to each host in your inventory. Keep everything else the same.
 
     ```bash
-    nano ~/labs/lab4/ansible/inventory.yml
+    nano inventory.yml
     ```
 
     ```yaml
@@ -672,35 +670,30 @@ Objective: push a routing configuration and confirm with a ping that it actually
               ansible_host: ceos2
               router_id: 10.255.0.2
           vars:
-            ansible_connection: ansible.netcommon.network_cli
-            ansible_network_os: arista.eos.eos
-            ansible_user: admin
-            ansible_password: admin
-            ansible_become: true
-            ansible_become_method: enable
+            # no change
     ```
 
 2. Create the template. IP routing is disabled by default on cEOS, that has to be turned on globally before OSPF can do anything, no matter what else is configured.
 
     ```bash
-    nano ~/labs/lab4/ansible/templates/ospf.j2
+    nano templates/ospf.j2
     ```
 
     ```jinja
     ip routing
     !
     interface Ethernet1
-       ip ospf area 0.0.0.0
+      ip ospf area 0.0.0.0
     !
     interface Ethernet2
-       ip ospf area 0.0.0.0
+      ip ospf area 0.0.0.0
     !
     router ospf 100
-       router-id {{ router_id }}
-       passive-interface default
-       no passive-interface Ethernet1
-       no passive-interface Ethernet2
-       max-lsa 12000
+      router-id {{ router_id }}
+      passive-interface default
+      no passive-interface Ethernet1
+      no passive-interface Ethernet2
+      max-lsa 12000
     ```
 
     passive-interface default followed by two no passive-interface lines is a defensive pattern, every interface starts passive, and only the two you explicitly reactivate will ever form an adjacency, rather than relying only on which interfaces happen to have ip ospf area set.
@@ -708,7 +701,7 @@ Objective: push a routing configuration and confirm with a ping that it actually
 3. Create the playbook.
 
     ```bash
-    nano ~/labs/lab4/ansible/configure_ospf.yml
+    nano configure_ospf.yml
     ```
 
     ```yaml
@@ -725,69 +718,59 @@ Objective: push a routing configuration and confirm with a ping that it actually
 4. Run it.
 
     ```bash
-    ansible-playbook -i ansible/inventory.yml ansible/configure_ospf.yml
+    ansible-playbook -i inventory.yml configure_ospf.yml
     ```
 
 5. Verify adjacencies formed, from either cEOS node.
 
     ```bash
-    ssh admin@ceos2
-    ```
-
-    ```text
-    show ip ospf neighbor
+    ansible -i inventory.yml ceos -m arista.eos.eos_command -a "commands='show ip ospf neighbor'"
     ```
 
     You should see both ceos1, 10.255.0.1, and srl1, 10.255.0.3, listed as FULL.
 
-6. Confirm OSPF actually learned something ceos2 didn't already have a route to.
+6. Confirm OSPF actually learned something the nodes didn't already have a route to.
 
-    ```text
-    show ip route ospf
+    ```bash
+    ansible -i inventory.yml ceos -m arista.eos.eos_command -a "commands='show ip route ospf'"
     ```
 
-    You should see 10.0.13.0/30 via 10.0.12.1, the srl1 to ceos1 link, a subnet ceos2 has no interface on at all.
+7. Prove it with two traceroute, from `ceos1` and `ceos2` to a remote subnet.
 
-7. Prove it with two pings, from ceos2, one to that transit subnet, one to srl1's loopback.
-
-    ```text
-    ping 10.0.13.1
-    ping 10.255.0.3
+    ```bash
+    docker exec -it ceos1 Cli -c "traceroute 10.0.23.2"
+    docker exec -it ceos2 Cli -c "traceroute 10.0.13.1"
     ```
 
-    Both should succeed. Neither address sits on an interface ceos2 has ever been directly connected to.
+    Both should succeed by going through a transit subnet.
+
+    Note: You can use Ansible ad hoc command in this step. Remember to specify which node you want to use, otherwise the command will be execute in all nodes in the inventory.
+
+    ```bashn
+    ansible -i inventory.yml ceos1 -m arista.eos.eos_command -a "commands='traceroute 10.0.23.2'"  
+    ```
 
 ### Questions and Deliverables
 
-1. Provide the `show ip ospf neighbor` output from step 5.
-2. Provide the `show ip route ospf` output from step 6, and the ping output from step 7.
-3. Before this task, ceos2 had no route to 10.0.13.0/30 at all, not even a failed one, since nothing had ever told it the subnet existed. What specifically made that route appear, the interface level ip ospf area command, the router ospf block, or both together?
+1. Provide the outputs from steps 5, 6, and 7.
 
 ## Task 14: Committing Your Work
 
 Objective: bring this lab's files into your existing repository.
 
-1. Move to the root of your repository.
+1. Move to the root of your repository and check files that need to be added.
 
     ```bash
     cd ~/labs
     git status
     ```
 
-2. Exclude the virtual environment.
-
-    ```bash
-    echo "lab4/.velab4/" >> .gitignore
-    ```
-
 3. Stage and confirm what is about to be committed.
 
     ```bash
-    git add lab4 .gitignore
+    git add lab4 requirements.txt
     git status
     ```
-
-    Confirm .velab4 does not appear.
 
 4. Commit and push.
 
@@ -798,8 +781,8 @@ Objective: bring this lab's files into your existing repository.
 
 ### Questions and Deliverables
 
-1. Provide the output of git status from step 3.
-2. Provide the output of git log --oneline -5 after your commit.
+1. Provide the output of `git status` from step 3.
+2. Provide the output of `git log --oneline -5` after your commit.
 
 # Clean Up
 
@@ -827,17 +810,13 @@ deactivate
 
 Confirm your repository includes, at minimum, the following, then submit as instructed by your course delivery platform:
 
-- lab4/scripts/subscribe_sample.py, subscribe_onchange.py, set_ospf_loopback.py, nc_wrapper.sh, netconf_tool.py, gnmi_tool.py, devicelib.py, and devices.yaml
+- lab4/scripts/ files
 - lab4/ansible/inventory.yml
-- lab4/ansible/templates/description.j2 and ospf.j2
-- lab4/ansible/facts.yml, configure_description.yml, compliance_check.yml, and configure_ospf.yml
-- lab4/requirements.txt
-- The updated .gitignore excluding lab4/.velab4
+- lab4/ansible/templates files
+- lab4/ansible/ files 
+- requirements.txt
 - Your answers to the Questions and Deliverables sections, submitted as your lab report per your instructor's separate instructions
 
-```bash
-git log --oneline --graph -10
-```
 
 \newpage
 
@@ -866,8 +845,8 @@ git log --oneline --graph -10
 |---|-----|
 | ansible-galaxy collection install <collection> | Install a collection not bundled with ansible-core |
 | ansible-galaxy collection list | List installed collections |
-| ansible -i <inventory> <group> -m <module> -a "<args>" | Run a single ad hoc module against a group |
-| ansible-playbook -i <inventory> <playbook>.yml | Run a playbook |
+| ansible -i \<inventory\> \<group\> -m <module> -a "<args>" | Run a single ad hoc module against a group |
+| ansible-playbook -i \<inventory\> \<playbook\>.yml | Run a playbook |
 | ansible-playbook ... --check | Preview changes without applying them |
 | ansible-playbook ... --check --diff | Preview changes and show exactly what would differ |
 

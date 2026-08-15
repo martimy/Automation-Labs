@@ -1,28 +1,44 @@
 ---
-title: Lab 5
+title: INWK6312 - Lab 5
 subtitle: Source of Truth, Real Traffic Telemetry, and a CI/CD Pipeline
 highlight-style: tango
 toc: true
+fontsize: 11pt
+numbersections: false
+colorlinks: true
+listings: true
+documentclass: article
 output:
-  pdf_document:
-    highlight: custom-tango.theme # option: tango, pygments, kate, monochrome, espresso, haddock, breezedark
-    toc_depth: 2
+    pdf_document:
+        toc_depth: 2
+        highlight: custom-tango.theme # option: tango, pygments, kate, monochrome, espresso, haddock, breezedark
 geometry: margin=1in
 
-header-includes:
-  - \usepackage{fvextra}
-  - \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+header-includes: |
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+  \usepackage{fancyhdr}
+  \usepackage{lastpage}
+  \pagestyle{fancy}
+  \fancyhf{}
+  
+  \lhead{\title}
+  \renewcommand{\headrulewidth}{0.5pt}
+
+  \lfoot{v1.0}
+  \cfoot{\copyright\ 2026 INWK6312}
+  \rfoot{Page \thepage\ of \pageref{LastPage}}
+  \renewcommand{\headrulewidth}{0.5pt}
 ---
 
 \newpage
+
 
 # Introduction
 
 This labs covers several topics, including NetBox as a source of truth, receiving telemetry, implementing a CI/CD pipeline, and verification with both Ansible and Batfish.
 
 You will deploy a NetBox instance and populate it with a script. You will extend the network topology used throughout all labs with two hosts to generate traffic through the network and watch it via gNMI. You will also build a small CI/CD pipeline utilizing Ansible and Batfish for doing configuration state verification wrapped in a GitHub Actions workflow that runs automatically when you push.
-
-This lab starts by redeploying the network topology from its saved state. If the saved configuration is lost, you will need to reconfigure the interfaces and OSPF on all routers before continuing using the Appendix.
 
 # Lab Objectives
 
@@ -42,21 +58,19 @@ By the end of this lab, you will be able to:
 <!-- stop calling it "Lab2 ring" and call it the "network topology" or the "network" instead -->
 You will need:
 
-- Your network topology, redeployed from its saved state in Task 3
-- Your GitHub Classroom repository, cloned and up to date, now containing labs/lab1 through labs/lab4
-- Your own already fixed copies of the tools from labs/lab4/scripts
+- Your network topology
+- Your GitHub Classroom repository
 - Docker and Docker Compose, already available on your VM
 
-NetBox and Batfish both get cloned and run from outside your repository, `~/netbox-docker` and `~/batfish` respectively, the same reasoning as ~/tools since Lab 3, none of these should ever become a nested git repository inside your own.
 
 Addressing used in this lab, extending what previous labs already established:
 
 | Segment | Node : Interface | Address |
 |---|---|---|
 | ceos1 to host1 | ceos1 : Ethernet3 | 10.0.100.1/24 |
-| ceos1 to host1 | host1 | 10.0.100.2/24 |
+| ceos1 to host1 | host1 : eth1 | 10.0.100.2/24 |
 | ceos2 to host2 | ceos2 : Ethernet3 | 10.0.200.1/24 |
-| ceos2 to host2 | host2 | 10.0.200.2/24 |
+| ceos2 to host2 | host2 : eth1 | 10.0.200.2/24 |
 
 \newpage
 
@@ -66,8 +80,6 @@ Addressing used in this lab, extending what previous labs already established:
 
 Objective: Deploy NetBox with minimal manual setup to get an API token, everything after that happens through the API.
 
-<!-- skip deploying the network topology since it won't be used until Part B -->
-
 1. NetBox Docker image is pre-installed, launch it via `docker compose`.
 
     ```bash
@@ -75,7 +87,7 @@ Objective: Deploy NetBox with minimal manual setup to get an API token, everythi
     docker compose up -d
     ```
 
-    Monitor the output. All volumes and containers sould be created. Docker compose could timeout and report "unhealty" for container `netbox-1`. Ignore that for now.  
+    Monitor the output. All volumes and containers should be created. Docker compose could timeout and report "unhealthy" for container `netbox-1`. Ignore that for now.  
 
 2. Watch the logs for few minutes until it settles.
 
@@ -91,52 +103,55 @@ Objective: Deploy NetBox with minimal manual setup to get an API token, everythi
     cat docker-compose.override.yml
     ```
 
-4. Save the token where your scripts can find it, rather than pasting it into every file you write.
+4. Save the token where your scripts can find it using the format "nbt_.<SUPERUSER_API_KEY>.<SUPERUSER_API_TOKEN>".
 
     ```bash
-    mkdir -p ~/labs/lab5/scripts ~/labs/lab5/ansible ~/labs/lab5/checks ~/labs/lab5/topology
-    echo "NETBOX_TOKEN=<paste-your-token-here>" > ~/labs/lab5/.env
-    echo "NETBOX_URL=http://localhost:8000" >> ~/labs/lab5/.env
+    cd ~/labs
+    nano .env
     ```
 
-5. Create a virtual environment for this lab and install what it needs.
+    ```text
+    NETBOX_TOKEN=nbt_<SUPERUSER_API_KEY>.<SUPERUSER_API_TOKEN>
+    NETBOX_URL=http://localhost:8000
+    ```
+
+5. Create this lab's folder structure
 
     ```bash
-    cd ~/labs/lab5
-    python3 -m venv .velab5
-    source .velab5/bin/activate
+    mkdir -p lab5/scripts lab5/ansible lab5/checks
+    ```
+6. Activate the virtual environment install what this lab needs.
+
+    ```bash
+    source .velab/bin/activate
     pip install pynetbox python-dotenv
-    cp ~/labs/lab4/scripts/* ~/labs/lab5/scripts/.
-    pip install -r ~/tools/requirements.txt
     pip freeze > requirements.txt
     ```
 
 ### Questions and Deliverables
 
 1. Provide the output of docker compose logs once NetBox is up, showing it accepting connections.
-2. This token is sitting in a plaintext file on your VM, readable by anyone with access to it. Why is that an acceptable tradeoff for this disposable lab environment, but not for a token that could reach a production NetBox instance?
 
 ## Task 1: Populating NetBox with the Existing Topology
 
-Objective: model `ceos1`, `ceos2`, and `srl1` in NetBox using `pynetbox` instead of using the web interface.
+Objective: model the network nodes in NetBox using Python's `pynetbox`.
 
-1. Create the data file. `ceos1` and `ceos2` are done for you, `srl1` is your job, following the same pattern.
+1. Create the data file below. Two nodes are included, you need to add the third node, `srl1`, following the same pattern.
 
     ```bash
-    nano ~/labs/lab5/scripts/netbox_data.yaml
+    cd ~/labs/lab5
+    nano scripts/netbox_data.yaml
     ```
 
     ```yaml
     site:
       name: INWK6312 Lab
       slug: inwk6312-lab
-
     manufacturers:
       - name: Arista
         slug: arista
       - name: Nokia
         slug: nokia
-
     device_types:
       - model: cEOS
         slug: ceos
@@ -144,17 +159,15 @@ Objective: model `ceos1`, `ceos2`, and `srl1` in NetBox using `pynetbox` instead
       - model: SR Linux
         slug: sr-linux
         manufacturer: nokia
-
     roles:
       - name: Router
         slug: router
         color: "2196f3"
 
-
-    # Addressing here matches Lab 2's table:
-    #   ceos1 Ethernet1 <-> ceos2 Ethernet1   10.0.12.1 / 10.0.12.2
-    #   ceos2 Ethernet2 <-> srl1 ethernet-1/1.0 10.0.23.1 / 10.0.23.2
-    #   srl1 ethernet-1/2.0 <-> ceos1 Ethernet2 10.0.13.1 / 10.0.13.2
+    # IP Addresses:
+    #   ceos1 Ethernet1 (10.0.12.1/30) <-> ceos2 Ethernet1 (10.0.12.2/30)
+    #   ceos2 Ethernet2 (10.0.23.1/30) <-> srl1 ethernet-1/1.0 (10.0.23.2/30)
+    #   srl1 ethernet-1/2.0 (10.0.13.1/30) <-> ceos1 Ethernet2 (10.0.13.2/30)
     devices:
       - name: ceos1
         device_type: ceos
@@ -164,9 +177,6 @@ Objective: model `ceos1`, `ceos2`, and `srl1` in NetBox using `pynetbox` instead
             address: 10.0.12.1/30
           - name: Ethernet2
             address: 10.0.13.2/30
-          - name: Ethernet3
-            address: 10.0.100.1/24
-
       - name: ceos2
         device_type: ceos
         role: router
@@ -175,26 +185,28 @@ Objective: model `ceos1`, `ceos2`, and `srl1` in NetBox using `pynetbox` instead
             address: 10.0.12.2/30
           - name: Ethernet2
             address: 10.0.23.1/30
-          - name: Ethernet3
-            address: 10.0.200.1/30
 
     # TODO: add srl1, following the same pattern as ceos1 and ceos2 above.
-    # device_type is sr-linux, and its two interfaces are named
-    # ethernet-1/1 and ethernet-1/2. Addresses are in the
+    # device_type is sr-linux and its two interfaces are named
+    # ethernet-1/1.0 and ethernet-1/2.0. Addresses are in the
     # table in the comment above.
     ```
 
-2. Create the script. This file reads `netbox_data.yaml` and creates whatever it describes, you shouldn't need to edit this one at all, the data file is where the actual work happens.
+2. Create the Python script. The script reads `netbox_data.yaml` and creates whatever it describes.
 
     ```bash
-    nano ~/labs/lab5/scripts/populate_netbox.py
+    nano scripts/populate_netbox.py
     ```
 
     ```python
     import os
+    import sys
     import yaml
     import pynetbox
     from dotenv import load_dotenv
+
+    load_dotenv()
+    nb = pynetbox.api(os.environ["NETBOX_URL"], token=os.environ["NETBOX_TOKEN"])
 
     def get_or_create(endpoint, filters, **create_fields):
         """
@@ -207,75 +219,90 @@ Objective: model `ceos1`, `ceos2`, and `srl1` in NetBox using `pynetbox` instead
             return existing
         return endpoint.create(**{**filters, **create_fields})
 
-    load_dotenv()
-    nb = pynetbox.api(os.environ["NETBOX_URL"], token=os.environ["NETBOX_TOKEN"])
+    def main(data):
 
-    with open("netbox_data.yaml") as f:
-        data = yaml.safe_load(f)
-
-    site = get_or_create(nb.dcim.sites, {"slug": data["site"]["slug"]}, name=data["site"]["name"], status="active")
-
-    manufacturers = {}
-    for m in data["manufacturers"]:
-        manufacturers[m["slug"]] = get_or_create(nb.dcim.manufacturers, {"slug": m["slug"]}, name=m["name"])
-
-
-    device_types = {}
-    for dt in data["device_types"]:
-        device_types[dt["slug"]] = get_or_create(
-            nb.dcim.device_types,
-            {"slug": dt["slug"]},
-            model=dt["model"],
-            manufacturer=manufacturers[dt["manufacturer"]].id,
-        )
-
-    device_roles = {}
-    for rl in data["roles"]:
-        device_roles[rl["slug"]] = get_or_create(
-            nb.dcim.device_roles,
-            {"slug": rl["slug"]},
-            name=rl["name"],
-            color=rl["color"],
-        )
-
-    for dev in data["devices"]:
-        device = get_or_create(
-            nb.dcim.devices,
-            {"name": dev["name"], "site": site.slug},
-            site=site.id,
-            device_type=device_types[dev["device_type"]].id,
-            role=device_roles[dev["role"]].id,
+        site = get_or_create(
+            nb.dcim.sites,
+            {"slug": data["site"]["slug"]},
+            name=data["site"]["name"],
             status="active",
         )
 
-        for iface in dev["interfaces"]:
-            interface = get_or_create(
-                nb.dcim.interfaces,
-                {"device_id": device.id, "name": iface["name"]},
-                device=device.id,
-                type="other",
+        manufacturers = {}
+        for m in data["manufacturers"]:
+            manufacturers[m["slug"]] = get_or_create(
+                nb.dcim.manufacturers, {"slug": m["slug"]}, name=m["name"]
             )
 
-            if "address" in iface:
-                get_or_create(
-                    nb.ipam.ip_addresses,
-                    {"address": iface["address"]},
-                    assigned_object_type="dcim.interface",
-                    assigned_object_id=interface.id,
+        device_types = {}
+        for dt in data["device_types"]:
+            device_types[dt["slug"]] = get_or_create(
+                nb.dcim.device_types,
+                {"slug": dt["slug"]},
+                model=dt["model"],
+                manufacturer=manufacturers[dt["manufacturer"]].id,
+            )
+
+        device_roles = {}
+        for rl in data["roles"]:
+            device_roles[rl["slug"]] = get_or_create(
+                nb.dcim.device_roles,
+                {"slug": rl["slug"]},
+                name=rl["name"],
+                color=rl["color"],
+            )
+
+        for dev in data["devices"]:
+            device = get_or_create(
+                nb.dcim.devices,
+                {"name": dev["name"], "site": site.slug},
+                site=site.id,
+                device_type=device_types[dev["device_type"]].id,
+                role=device_roles[dev["role"]].id,
+                status="active",
+            )
+
+            for iface in dev["interfaces"]:
+                interface = get_or_create(
+                    nb.dcim.interfaces,
+                    {"device_id": device.id, "name": iface["name"]},
+                    device=device.id,
+                    type="other",
                 )
 
-    print(f"NetBox populated from netbox_data.yaml: {len(data['devices'])} device(s) processed")
-    ```
+                if "address" in iface:
+                    get_or_create(
+                        nb.ipam.ip_addresses,
+                        {"address": iface["address"]},
+                        assigned_object_type="dcim.interface",
+                        assigned_object_id=interface.id,
+                    )
 
-3. Complete the missing `srl1` entry in `netbox_data.yaml`.
+    if __name__ == "__main__":
+
+        if len(sys.argv) < 2:
+            print("Error: Please provide a filename.")
+            sys.exit(1)
+
+        filename = sys.argv[1]
+
+        with open(filename) as f:
+            data = yaml.safe_load(f)
+
+        main(data)
+
+        print(
+            f"NetBox populated from netbox_data.yaml: {len(data['devices'])} device(s) processed"
+        )
+    ```
 
 4. Run the script.
 
     ```bash
-    python scripts/populate_netbox.py
+    python3 scripts/populate_netbox.py scripts/netbox_data.yaml
     ```
 
-5. Look at the result in the web UI, Devices, then one of your three routers, confirm its interfaces and addresses are there. Spend time looking around and discovering NetBox, you won't be using the UI in this lab except for checking.
+5. Look at the result in the web UI and confirm that devices, interfaces, and addresses are there. Spend time looking around and discovering NetBox, you won't be using the UI in this lab except for checking.
 
 ### Questions and Deliverables
 
@@ -286,17 +313,17 @@ Objective: model `ceos1`, `ceos2`, and `srl1` in NetBox using `pynetbox` instead
 
 Objective: retrieve the same data two different ways, and see why NetBox offers both.
 
-1. Query ceos1's interfaces over the REST API.
+1. Query `ceos1`'s interfaces over the REST API.
 
     ```bash
-    curl -s -H "Authorization: Token $(grep NETBOX_TOKEN ~/labs/lab5/.env | cut -d= -f2)" \
+    curl -s -H "Authorization: Token $(grep NETBOX_TOKEN ~/labs/.env | cut -d= -f2)" \
       "http://localhost:8000/api/dcim/interfaces/?device=ceos1" | python3 -m json.tool
     ```
 
 2. Query the same data over GraphQL, asking only for the fields you actually want, name and the addresses assigned to each interface.
 
     ```bash
-    curl -s -H "Authorization: Token $(grep NETBOX_TOKEN ~/labs/lab5/.env | cut -d= -f2)" \
+    curl -s -H "Authorization: Token $(grep NETBOX_TOKEN ~/labs/.env | cut -d= -f2)" \
       -H "Content-Type: application/json" \
       -d '{"query": "{ interface_list(filters: {device: {name: {exact: \"ceos1\"}}}) { name ip_addresses { address } } }"}' \
       "http://localhost:8000/graphql/" | python3 -m json.tool
@@ -305,8 +332,6 @@ Objective: retrieve the same data two different ways, and see why NetBox offers 
 ### Questions and Deliverables
 
 1. Provide the output of both queries.
-2. The REST response includes many fields you didn't ask for, id, url, device, mac_address, and more. The GraphQL response includes only what the query asked for. What is the practical cost of the REST response's extra fields when you're only querying three small devices, and why might that cost matter more at a much larger scale?
-
 
 
 \newpage
@@ -321,39 +346,44 @@ Objective: extend the network topology file by adding two hosts that connect to 
 1. Edit the network topology file.
 
     ```bash
-    nano ~/labs/lab2/topology/lab2-ring.clab.yml
+    nano ~/labs/topology/lab-net.clab.yml
     ```
 
     Add two new nodes and two new links, alongside the three that are already there.
 
     ```yaml
+    topology:
+      nodes:
+        # Add these nodes below the original nodes
         host1:
           kind: linux
           image: nicolaka/netshoot:latest
-        exec:
-          - ip link set dev eth1 mtu 1500
-          - ip addr add 10.0.100.2/24 dev eth1
-          - ip route replace 0/0 via 10.0.100.1
+          exec:
+            - ip link set dev eth1 mtu 1500
+            - ip addr add 10.0.100.2/24 dev eth1
+            - ip route replace 0/0 via 10.0.100.1
         host2:
           kind: linux
           image: nicolaka/netshoot:latest
-        exec:
-          - ip link set dev eth1 mtu 1500
-          - ip addr add 10.0.200.2/24 dev eth1
-          - ip route replace 0/0 via 10.0.200.1
+          exec:
+            - ip link set dev eth1 mtu 1500
+            - ip addr add 10.0.200.2/24 dev eth1
+            - ip route replace 0/0 via 10.0.200.1
     ```
-	
+
     ```yaml
+      links:
+        # Add these links below the original links
         - endpoints: ["ceos1:eth3", "host1:eth1"]
         - endpoints: ["ceos2:eth3", "host2:eth1"]
     ```
 
-    The `exec` command in the topology file changes netshoot's default interface MTU to 1500 to match the rest of the devices'. Additionally, it sets the IP addess of the host's interface and its default gateway.
+    The `exec` commands in the topology file set host's default interface MTU to 1500, the IP addess of the interface and the default gateway.
 
 2. Deploy the topology.
 
     ```bash
-    sudo containerlab deploy -t ~/labs/lab2/topology/lab2-ring.clab.yml
+    sudo containerlab deploy -t ~/labs/topology/lab-net.clab.yml
     ```
 
 3. The nodes should retain their past configuration, but if the configuration doesn't come back automatically, then you can apply the configuration list in the Appendix below.
@@ -365,29 +395,44 @@ Objective: extend the network topology file by adding two hosts that connect to 
     docker exec ceos1 traceroute 10.0.23.2
     ```
 
+    Note: you can execute the above commands directly from Docker because cEOS runs on Linux and implements the Linux IP command. 
+
 ### Questions and Deliverables
 
-1. Provide the output of `containerlab inspect -t ~/labs/lab2/topology/lab2-ring.clab.yml`, showing all five nodes running.
-2. Hosts `host1` and `host2` use `kind: linux`. What does specifying a kind actually control, based on what you've seen it do differently for the three router kinds in this course so far?
-
-<!-- Q2 is good question for lab2 -->
+1. Provide the output of `containerlab inspect -t ~/labs/topology/lab-net.clab.yml`, showing all five nodes running.
 
 ## Task 4: Modeling the New Pieces in NetBox
 
-Objective: extend Task 1's population to cover what Task 3 just added, keeping the source of truth in sync with the actual topology.
+Objective: extend NetBox data to cover the added nodes, keeping the source of truth in sync with the actual topology.
 
-1. Extend `netbox_data.yaml` by adding a new device role for the hosts, and entries for `host1` and `host2`, plus the two new router interfaces, `Ethernet3` on both `ceos1` and `ceos2`.
+1. Extend `netbox_data.yaml` by adding entries for `host1` and `host2`, plus the two new router interfaces, `Ethernet3` on both `ceos1` and `ceos2`.
 
     ```bash
-    nano ~/labs/lab5/scripts/netbox_data.yaml
+    cd ~/labs/lab5
+    nano scripts/netbox_data.yaml
     ```
 
-    Add a manufacturer, a role, and a device type for the hosts, then the two host devices, their one interface each, and IP addresses matching the addressing table in this lab's introduction.
+    Add a manufacturer, a role, and a device type for the hosts:
+    
+    ```yaml
+    manufacturers:
+      - name: Nicolaka
+        slug: nicolaka
+    device_types:
+      - model: Generic
+        slug: generic
+    roles:
+      - name: Host
+        slug: host
+        color: "ffa500"
+    ```
 
-2. Run `populate_netbox.py` again.
+2. Add the two host devices, `host1` and `host2`, with one interface each, and IP addresses matching the addressing table in this lab's introduction.
+3. Add interface `Ethernet3` to nodes `ceos1` and `ceos2` with IP addresses matching the addressing table in this lab's introduction.
+4. Save the YAML file then run `populate_netbox.py` again.
 
     ```bash
-    python scripts/populate_netbox.py
+    python3 scripts/populate_netbox.py scripts/netbox_data.yaml
     ```
 
 ### Questions and Deliverables
@@ -397,12 +442,13 @@ Objective: extend Task 1's population to cover what Task 3 just added, keeping t
 
 ## Task 5: Pushing Addressing from NetBox with Ansible
 
-Objective: use the source of truth actually to drive automation.
+Objective: use the source of truth to drive automation.
 
 1. Create an Ansible playbook that queries NetBox for each host's Ethernet3 address rather than having that address typed into a template variable anywhere.
 
     ```bash
-    nano ~/labs/lab5/ansible/configure_hosts_interface.yml
+    cd ~/labs/lab5
+    nano ansible/configure_hosts_interface.yml
     ```
 
     ```yaml
@@ -412,7 +458,7 @@ Objective: use the source of truth actually to drive automation.
       gather_facts: false
       vars:
         netbox_url: "http://localhost:8000"
-        netbox_token: "<paste-your-token-here>"
+        netbox_token: "{{ lookup('ansible.builtin.ini', 'NETBOX_TOKEN', type='properties', file='~/labs/.env') }}"
       tasks:
         - name: Look up this device's Ethernet 3 address in NetBox
           ansible.builtin.uri:
@@ -448,21 +494,17 @@ Objective: use the source of truth actually to drive automation.
 
    <!-- Space is needed for "Ethernet 3", so do not remove it -->
    
-2. Run it.
+2. Use the Ansible inventory from Lab4 to run the playbook.
 
     ```bash
-    ansible-playbook -i ~/labs/lab4/ansible/inventory.yml ~/labs/lab5/ansible/configure_hosts_interface.yml
+    ansible-playbook -i ~/labs/lab4/ansible/inventory.yml ansible/configure_hosts_interface.yml
     ```
 
 3. Verify on the network node.
 
     ```bash
-    ssh admin@ceos1
-    ```
-
-    ```text
-    show ip interface brief
-    show ip route ospf
+    ansible -i ~/labs/lab4/ansible/inventory.yml ceos -m arista.eos.eos_command -a "commands='show ip interface brief'"
+    ansible -i ~/labs/lab4/ansible/inventory.yml ceos -m arista.eos.eos_command -a "commands='show ip route ospf'"
     ```
 
 4. Verify from both hosts, using their Ethernet1 interfaces addresses instead of their hostnames. `host1` and `host2` resolve through /etc/hosts to their management addresses, not their Ethernet1 ones, so pinging by hostname here would test the wrong path entirely.
@@ -474,23 +516,16 @@ Objective: use the source of truth actually to drive automation.
 
 ### Questions and Deliverables
 
-1. Provide the output of step 2, and the ping output from step 4.
+1. Provide the output of step 3, and the ping output from step 4.
 2. If you changed host1's address in NetBox and reran this playbook, with nothing else touched, what would you expect Ansible to report, ok or changed? What does that tell you about where this playbook's actual source of truth lives?
-
-<!-- No need for Task 6. This saves some time. I left the task numbering intact for now -->
-
-
 
 \newpage
 
 # Part C: Traffic and Telemetry
 
-<!-- the results are not consistent. see a separate document for the observations. If the results cannot be consistent, I may cancel this part -->
-<!-- this was almost certainly the MTU issue confirmed and fixed in Task 3, worth retesting before deciding to cancel anything -->
+## Task 6: Generating Traffic with iperf3
 
-## Task 7: Generating Traffic with iperf3
-
-Objective: create real, sustained traffic between the two hosts.
+Objective: create sustained traffic between the two hosts.
 
 1. Start an iperf3 server on host2.
 
@@ -498,25 +533,25 @@ Objective: create real, sustained traffic between the two hosts.
     docker exec host2 iperf3 -s -D
     ```
 
-2. Run a client test from `host1`, thirty seconds is enough to watch meaningfully in the next task.
+2. Run a client test from `host1` for 30 seconds at 1Mbps. You must use the IP address of the destination rather than its name. Why?
 
     ```bash
-    docker exec host1 iperf3 -c 10.0.200.2 -t 30 -b 1G
+    docker exec host1 iperf3 -c 10.0.200.2 -t 30 -b 1M
     ```
 
 ### Questions and Deliverables
 
 1. Provide the summary line from the end of the `iperf3` output, showing the achieved throughput.
 
-## Task 8: Watching Real Telemetry
+## Task 7: Watching Real Telemetry
 
-Objective: reuse Lab 4's own subscribe script, retargeted from `srl1` to `ceos1`, and watch it report real traffic instead of ping sized blips.
+Objective: reuse gNMI subscribe script from Lab 4 to report telemetry from `ceos2`.
 
-1. Copy and modify `subscribe_sample.py` from Lab 4 to `ceos1` instead and modify the path.
+1. Copy `subscribe_sample.py` from Lab 4 and change the node to `ceos1` and the path.
 
     ```bash
     cd ~/labs/lab5/scripts
-    cp subscribe_sample.py subscribe_ceos_traffic.py
+    cp ~/labs/lab4/scripts/subscribe_sample.py subscribe_ceos_traffic.py
     nano subscribe_ceos_traffic.py
     ```
 
@@ -531,7 +566,7 @@ Objective: reuse Lab 4's own subscribe script, retargeted from `srl1` to `ceos1`
     subscribe_request = {
         "subscription": [
             {
-                "path": "interfaces/interface[name=Ethernet1]/state/counters/out-octets",
+                "path": "interfaces/interface[name=Ethernet3]/state/counters/in-octets",
                 "mode": "sample",
                 "sample_interval": 10000000000,
             }
@@ -546,18 +581,19 @@ Objective: reuse Lab 4's own subscribe script, retargeted from `srl1` to `ceos1`
             print(json.dumps(telemetryParser(response), indent=2))
     ```
 
-    This watches Ethernet1, ceos1's link to ceos2, not the new Ethernet3, since host1 to host2 traffic takes the direct path between the two cEOS nodes, not through either host facing interface.
+    This watches Ethernet3, `ceos1`'s link to `host1` which is generating the traffic towards `host2`.
 
 2. Start the script, then in a second terminal, run another iperf3 test while it's running.
 
     ```bash
-    cd ~/labs/lab5/scripts
     python3 subscribe_ceos_traffic.py
     ```
 
+    In a second terminal:
+
     ```bash
-    docker exec -d host2 iperf3 -s
-    docker exec host1 iperf3 -c 10.0.200.2 -t 30
+    docker exec host2 iperf3 -s -D
+    docker exec host1 iperf3 -c 10.0.200.2 -t 30 -b 1M
     ```
 
 3. Watch the counter values between updates, the difference between consecutive samples should track roughly with the throughput iperf3 reported.
@@ -567,7 +603,7 @@ Objective: reuse Lab 4's own subscribe script, retargeted from `srl1` to `ceos1`
 ### Questions and Deliverables
 
 1. Provide about a minute of output from step 2, spanning before, during, and after the iperf3 run.
-2. Pick two consecutive samples taken during the iperf3 run. The difference in out-octets between them, divided by the 10 second sample interval, gives you an average byte rate. How does that compare to the throughput iperf3 itself reported in Task 7?
+2. Pick two consecutive samples taken during the iperf3 run. The difference in out-octets between them, divided by the 10 second sample interval, gives you an average byte rate. How does that compare to the throughput iperf3 itself reported in Task 6?
 
 
 
@@ -575,14 +611,15 @@ Objective: reuse Lab 4's own subscribe script, retargeted from `srl1` to `ceos1`
 
 # Part D: A CI/CD Pipeline with Ansible and Batfish
 
-## Task 9: Ansible Based Verification
+## Task 8: Ansible Based Verification
 
 Objective: write verification tasks that check live state against what you expect, extending the register and assert pattern from Lab 4's compliance check.
 
 1. Create the playbook.
 
     ```bash
-    nano ~/labs/lab5/ansible/verify_network.yml
+    cd ~/labs/lab5
+    nano ansible/verify_network.yml
     ```
 
     ```yaml
@@ -616,16 +653,7 @@ Objective: write verification tasks that check live state against what you expec
 1. Provide the output of step 2.
 2. This check only confirms the word FULL appears somewhere in the output, it doesn't count how many neighbors, or check which specific ones. Extend the assert condition to also fail if fewer than 2 neighbors show FULL, and provide your modified task.
 
-<!-- Reference answer for Q2:
-        - name: Assert at least two neighbors are FULL
-          ansible.builtin.assert:
-            that:
-              - "ospf_output.stdout[0].count('FULL') >= 2"
-            fail_msg: "Fewer than 2 FULL OSPF neighbors found"
-            success_msg: "OSPF adjacency confirmed"
--->
-
-## Task 11: Configuring and Verifying NTP with Batfish Checks for cEOS
+## Task 9: Configuring and Verifying NTP with Batfish Checks for cEOS
 
 Objective: add NTP configuration to cEOS nodes. Before touching the production network, use Ansible to back up the config, add NTP configuration to the configuration files, then use Batfish to test the correctness of the NTP configuration and reachability to the NTP server.
 
@@ -634,7 +662,7 @@ Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only
 1. Start Batfish, its Docker image has already been pulled into your machine.
 
     ```bash
-    cd ~
+    cd ~/labs
     docker run -d --name batfish -p 9997:9997 -p 9996:9996 batfish/allinone
     pip install pybatfish
     pip freeze > requirements.txt
@@ -684,7 +712,7 @@ Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only
     end
     ```
 
-4. Repeat for `ceos2`, but use the wrong server.
+4. Repeat for `ceos2`, but use a different (incorrect) server.
 
     ```text
     !
@@ -705,7 +733,12 @@ Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only
 
     bf = Session(host="localhost")
     bf.set_network("lab5")
-    bf.init_snapshot("ceos", name="snapshot", extra_args={"ignoremanagementinterfaces": False}, overwrite=True)
+    bf.init_snapshot(
+        "ceos",
+        name="snapshot",
+        extra_args={"ignoremanagementinterfaces": False},
+        overwrite=True,
+    )
 
     COL_NAME = "NTP_Servers"
 
@@ -717,9 +750,7 @@ Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only
 
     # 2. Find nodes that have no NTP server in common with the reference set
     ns_violators = node_props[
-        node_props[COL_NAME].apply(
-            lambda x: len(ref_ntp_servers.intersection(set(x))) == 0
-        )
+        node_props[COL_NAME].apply(lambda x: len(ref_ntp_servers.intersection(set(x))) == 0)
     ]
 
     print("--- NTP Policy Violations ---")
@@ -739,21 +770,23 @@ Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only
 
     for node in node_props["Node"]:
         for ip in ref_ntp_servers:
-            headers = HeaderConstraints(
-                dstIps=ip,
-                ipProtocols=["UDP"],
-                dstPorts=["123"])
+            headers = HeaderConstraints(dstIps=ip, ipProtocols=["UDP"], dstPorts=["123"])
 
-            r_df = bf.q.reachability(
-                pathConstraints=PathConstraints(startLocation =f"{node}[Management0]"),
-                headers=headers,
-                actions='Delivered_to_subnet').answer().frame()
+            r_df = (
+                bf.q.reachability(
+                    pathConstraints=PathConstraints(startLocation=f"{node}[Management0]"),
+                    headers=headers,
+                    actions="Delivered_to_subnet",
+                )
+                .answer()
+                .frame()
+            )
 
             # Check if any trace reached an ACCEPTED status
             reachable = False
             if not r_df.empty and "Traces" in r_df.columns:
                 reachable = any(
-                    trace.disposition == "DELIVERED_TO_SUBNET" #"ACCEPTED"
+                    trace.disposition == "DELIVERED_TO_SUBNET"  # "ACCEPTED"
                     for traces in r_df["Traces"]
                     for trace in traces
                 )
@@ -768,7 +801,7 @@ Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only
         raise SystemExit(1)
     ```
 
-4. Run it. The check should fail because server `1.1.1.1` is not among the approved servers.
+6. Run it. The check should fail because server `1.1.1.1` is not among the approved servers.
 
     ```bash
     cd ~/labs/lab5/checks
@@ -777,16 +810,17 @@ Note: Batfish has no support for Nokia SR Linux at the moment, so this Task only
 
 ### Questions and Deliverables
 
-1. Provide the output of step 4, showing the failure for ceos2's unapproved NTP server, and the pass for ceos1's approved one.
-2. The reachability check confirms Batfish's model routes NTP traffic toward 172.20.20.1's subnet, not that a real NTP server there actually responds. What could this check miss that only testing against the live network could catch?
+1. Provide the output of step 4, showing a check failure due to ceos2's unapproved NTP server.
+2. The reachability check confirms Batfish's model routes NTP traffic toward 172.20.20.1's subnet. What could this check miss that only testing against the live network could catch?
 
-## Task 12: Wrapping It in GitHub Actions
+## Task 10: Wrapping It in GitHub Actions
 
-Objective: run the checks from Tasks 9 through 11 automatically whenever configuration work gets pushed, rather than remembering to run them by hand.
+Objective: run the checks from Task 9 automatically whenever configuration work gets pushed to GitHub.
 
 1. Create the workflow file in your repository.
 
     ```bash
+    cd ~/labs
     mkdir -p ~/labs/.github/workflows
     nano ~/labs/.github/workflows/config-check.yml
     ```
@@ -845,7 +879,7 @@ Objective: run the checks from Tasks 9 through 11 automatically whenever configu
     git push
     ```
 
-3. Add the checks folder, then commit and push. `ceos2.cfg` is still carrying the deliberate error from Task 11, so this push should trigger a failing run.
+3. Add the checks folder, then commit and push. `ceos2.cfg` is still carrying the deliberate error from Task 9, so this push should trigger a failing run.
 
     ```bash
     git add lab5/checks/
@@ -854,15 +888,14 @@ Objective: run the checks from Tasks 9 through 11 automatically whenever configu
     ```
 
 4. Confirm the Actions tab shows a failed run this time, and that the log names the actual reason, no overlapping reference NTP servers found.
-
-5. Change the server IP to "172.20.20.1" in `ceos2`, commit, and push again, confirming that the check passes.
+5. Change the server IP to "172.20.20.1" in `ceos2`, then repeat step 3 and confirm that the check passes.
 
 ### Questions and Deliverables
 
-1. Provide a link to your GitHub Actions run history, or paste the relevant log excerpt, showing one passing run and one failing run.
-2. The workflow only triggers on changes under lab5/checks, not on every push to the repository. Why does that scoping matter, given this repository also contains four other labs' worth of files?
+1. Provide a link to your GitHub Actions run history, or paste the relevant log excerpt, showing one failing run and one passing run.
+2. The workflow only triggers on changes under lab5/checks, not on every push to the repository. Why does that scoping matter, given this repository also contains other files?
 
-## Task 13: Committing Your Work
+## Task 11: Committing Your Work
 
 Objective: bring the rest of this lab's files into your repository.
 
@@ -873,23 +906,14 @@ Objective: bring the rest of this lab's files into your repository.
     git status
     ```
 
-2. Exclude the virtual environment and NetBox's own token file.
+2. Stage and confirm what is about to be committed.
 
     ```bash
-    echo "lab5/.velab5/" >> .gitignore
-    echo "lab5/.env" >> .gitignore
-    ```
-
-3. Stage and confirm what is about to be committed.
-
-    ```bash
-    git add lab2/topology/lab2-ring.clab.yml lab5 .gitignore
+    git add topology/lab-net.clab.yml lab5 requirements.txt
     git status
     ```
 
-    Confirm `.velab5` and `.env` do not appear, and that the modified topology file from Task 3 is included.
-
-4. Commit and push.
+3. Commit and push.
 
     ```bash
     git commit -m "Add Lab 5, NetBox source of truth, real traffic telemetry, and CI/CD pipeline"
@@ -898,16 +922,15 @@ Objective: bring the rest of this lab's files into your repository.
 
 ### Questions and Deliverables
 
-1. Provide the output of git status from step 3.
-2. Provide the output of git log --oneline -5 after your commit.
+1. Provide the output of `git log --oneline -5` after your commit.
 
 # Clean Up
 
 Save the network's configuration, then destroy it.
 
 ```bash
-sudo containerlab save -t ~/labs/lab2/topology/lab2-ring.clab.yml
-sudo containerlab destroy -t ~/labs/lab2/topology/lab2-ring.clab.yml
+sudo containerlab save -t ~/labs/topology/lab-net.clab.yml
+sudo containerlab destroy -t ~/labs/topology/lab-net.clab.yml
 ```
 
 NetBox and Batfish are not part of the saved topology state, stop them separately if you want to reclaim the resources.
@@ -933,17 +956,12 @@ deactivate
 
 Confirm your repository includes, at minimum, the following, then submit as instructed by your course delivery platform:
 
-- The modified labs/lab2/topology/lab2-ring.clab.yml, with host1 and host2 added
+- The modified labs/topology/lab-net.clab.yml, with host1 and host2 added
 - lab5/scripts/populate_netbox.py and subscribe_ceos_traffic.py
 - lab5/ansible/configure_hosts_interface.yml, verify_network.yml, and backup_configs.yml
 - lab5/checks/batfish_ntp_check.py
 - .github/workflows/config-check.yml
-- The updated .gitignore excluding lab5/.velab5 and lab5/.env
 - Your answers to the Questions and Deliverables sections, submitted as your lab report per your instructor's separate instructions
-
-```bash
-git log --oneline --graph -10
-```
 
 \newpage
 
@@ -981,7 +999,7 @@ git log --oneline --graph -10
 | Command | Usage |
 |---|---|
 | iperf3 -s | Run as a server, listening for a client |
-| iperf3 -c <address> -t <seconds> | Run as a client against a server for a fixed duration |
+| iperf3 -c \<address\> -t \<seconds\> | Run as a client against a server for a fixed duration |
 
 ## Default Credentials
 
@@ -997,7 +1015,7 @@ Copy and paste the configuration below into each network node.
 
 ## ceos1
 
-```
+```text
 interface Ethernet1
    no switchport
    ip address 10.0.12.1/30
@@ -1031,7 +1049,7 @@ end
 
 ## ceos2
 
-```
+```text
 interface Ethernet1
    no switchport
    ip address 10.0.12.2/30
@@ -1071,7 +1089,7 @@ info flat | filter interface
 info flat | filter network-instance
 -->
 
-```
+```text
 set / interface ethernet-1/1 admin-state enable
 set / interface ethernet-1/1 subinterface 0 ipv4 admin-state enable
 set / interface ethernet-1/1 subinterface 0 ipv4 address 10.0.23.2/30
