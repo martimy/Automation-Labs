@@ -40,26 +40,19 @@ header-includes: |
 
 # Introduction
 
-This labs covers several topics, including NetBox as a source of truth, receiving telemetry, implementing a CI/CD pipeline, and verification with both Ansible and Batfish.
-
-You will deploy a NetBox instance and populate it with a script. You will extend the network topology used throughout all labs with two hosts to generate traffic through the network and watch it via gNMI. You will also build a small CI/CD pipeline utilizing Ansible and Batfish for doing configuration state verification wrapped in a GitHub Actions workflow that runs automatically when you push.
+This lab covers using NetBox as a source of truth, receiving real telemetry, and wrapping automated verification into a CI/CD pipeline. You will deploy a NetBox instance and populate it with a script, extend the network topology with two hosts that generate real traffic, and watch that traffic with a gNMI Subscribe script. You will then verify the network's state with Ansible and Batfish, wired into a GitHub Actions workflow that runs automatically on every push.
 
 # Lab Objectives
 
 By the end of this lab, you will be able to:
 
-1. Deploy NetBox and populate it programmatically using its Python SDK, rather than through the web interface
-2. Query the same data through both a REST and a GraphQL API and compare the two
-3. Extend an existing Containerlab topology with new nodes and reconfigure it without losing what was already there
-4. Use Ansible to pull configuration data from an external source of truth instead of a hardcoded template variable
-5. Generate real network traffic with iperf3 and observe it with a gNMI Subscribe script adapted from a previous lab
-6. Write Ansible based verification tasks, register and assert, against live configuration state
-7. Write a narrow Batfish check against a single vendor's configuration and understand why it couldn't cover the whole network
-8. Wire configuration checks into a GitHub Actions workflow that runs automatically on push
+1. Deploy and populate NetBox programmatically as a source of truth, and query the same data through both REST and GraphQL.
+2. Extend the network topology with new hosts, generate real traffic with iperf3, and observe it live with a gNMI Subscribe script.
+3. Use Ansible to pull configuration from NetBox instead of a hardcoded value, and verify the resulting state automatically.
+4. Wire configuration verification into a CI/CD pipeline using Batfish and GitHub Actions, so checks run automatically on every push.
 
 # Lab Environment and Preparation
 
-<!-- stop calling it "Lab2 ring" and call it the "network topology" or the "network" instead -->
 You will need:
 
 - Your network topology
@@ -409,11 +402,16 @@ Objective: extend the network topology file by adding two hosts that connect to 
 4. You can quickly check if the configuration is correct and if routing works properly:
 
     ```bash
+    ansible -i ~/labs/lab4/ansible/inventory.yml ceos1 -m arista.eos.eos_command -a "commands='ip route'"
+    ansible -i ~/labs/lab4/ansible/inventory.yml ceos1 -m arista.eos.eos_command -a "commands='traceroute 10.0.23.2'"
+    ```
+
+    Note: Ansible is fully established from Lab4 so it will be used here to avoid the CLI. However, you can also execute the above commands directly from Docker because cEOS runs on Linux and implements the Linux IP command bypassing its CLI. 
+    
+    ```bash
     docker exec ceos1 ip route
     docker exec ceos1 traceroute 10.0.23.2
     ```
-
-    Note: you can execute the above commands directly from Docker because cEOS runs on Linux and implements the Linux IP command. 
 
 ### Questions and Deliverables
 

@@ -39,19 +39,16 @@ header-includes: |
 
 # Introduction
 
-The first part of this lab covers working with data formats and YANG outside of any live device, and using pyang tool to catch errors in a YANG module before using it in real hardware. The second part covers using NETCONF tools to discover what a network device supports, read write a configuration payload.
+The first part of this lab works with data formats and YANG, using the pyang tool to catch errors in a YANG module before it is deployed to active device. In the second part, you will use NETCONF to discover a device's capabilities and supported YANG modules, then read and write configuration payload.
 
 # Lab Objectives
 
 By the end of this lab, you will be able to:
 
-1. Convert a small dataset between JSON and YAML using Python's json and yaml libraries
-2. Read an RFC 8340 YANG tree diagram and identify configuration versus operational state nodes
-3. Use pyang to catch structural and syntax errors in a YANG module before trusting it against a real device
-4. Verify NETCONF reachability on a network device before scripting against it
-5. Discover a device's supported NETCONF capabilities and YANG modules, and pull a YANG schema directly off a live device
-6. Read a real NETCONF configuration payload and connect it back to the module that defines it, including vendor augmentation
-7. Write a Python script using ncclient to edit and commit a configuration change through a device's candidate datastore
+1. Work with structured data, JSON, YAML, and YANG, well enough to read a module's tree diagram and validate it with pyang.
+2. Verify NETCONF reachability and discover what a device can support.
+3. Read a real NETCONF configuration payload and connect it back to the YANG module that defines it, including vendor augmentation.
+4. Write a Python script with ncclient to edit and commit a configuration change through a device's candidate datastore.
 
 # Lab Environment and Preparation
 

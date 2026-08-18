@@ -40,19 +40,16 @@ header-includes: |
 
 # Introduction
 
-This lab introduces the fundamental Linux and version control skills required for the remainder of the course. You will work directly on an Ubuntu virtual machine to build a routed network using Linux namespaces, which serves as a manual precursor to the containerized emulation used in later modules. Instead of treating this as a standalone exercise, you will establish a professional repository structure that will house all your work, shared tools, and network topologies for Labs 2 through 5.
+This lab introduces fundamental Linux and version control skills. You will also build a small routed network using Linux namespaces. Additionally, you will set up the repository structure that houses your work, shared tools, and network topologies for the subsequent labs.
 
 # Lab Objectives
 
 By the end of this lab, you will be able to:
 
-1. Navigate the Linux filesystem and establish a multi-module project hierarchy.
-2. Manage file ownership and permissions for automation scripts.
-3. Use text processing tools like `grep` and `sed` to manipulate configuration data.
-4. Manage `systemd` services through their full lifecycle.
-5. Configure isolated network environments using namespaces, veth pairs, and static routing.
-6. Initialize a centralized Python virtual environment and a global Git repository.
-7. Implement a professional Git workflow including branching, merge conflict resolution, and pull requests.
+1. Work confidently in a Linux shell, navigating the filesystem, managing file permissions, and controlling systemd services, well enough to support automation work in later labs.
+2. Build and troubleshoot a simple routed network using Linux namespaces, veth pairs, and static routing.
+3. Set up the shared Python virtual environment and Git repository used throughout the course.
+4. Use a professional Git workflow, branching, merge conflict resolution, and pull requests, to manage change safely.
 
 # Lab Environment and Preparation
 

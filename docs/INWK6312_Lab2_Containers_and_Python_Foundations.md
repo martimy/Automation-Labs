@@ -39,20 +39,17 @@ header-includes: |
 
 # Introduction
 
-This lab covers Docker then use Containerlab to deploy a small mixed vendor topology, two Arista cEOS nodes and one Nokia SR Linux node, connected in a ring. You will bring up Layer 3 reachability on that topology by hand, using each vendor's own CLI. In the second part of the lab, you will build an isolated Python environment and use Netmiko to talk to the Arista nodes over SSH instead of typing commands yourself, parse the CLI output you get back, and handle a connection failure with a custom exception instead of letting the script crash.
+This lab covers Docker, then uses Containerlab to deploy a small mixed vendor topology, two Arista cEOS nodes and one Nokia SR Linux node, connected in a ring. You will configure Layer 3 connectivity manually using each vendor's own CLI. In the second part of the lab, you will build an isolated Python environment and use Netmiko to talk to the Arista nodes over SSH, parse the CLI output you get back, and handle a connection failure with a custom exception.
 
 # Lab Objectives
 
 By the end of this lab, you will be able to:
 
-1. Inspect Docker images and containers to explain the difference between an image and a running container
-2. Explain the components of a Containerlab topology definition file, including kinds, nodes, images, and links
-3. Deploy a multi vendor topology combining Arista cEOS and Nokia SR Linux nodes
-4. Manually configure Layer 3 interfaces on both Arista EOS and Nokia SR Linux, and confirm reachability across a fully meshed topology
-5. Utilize the centralized Python virtual environment established in Lab 1 to manage project dependencies
-6. Use Netmiko to connect to a network device over SSH and retrieve CLI output
-7. Parse unstructured CLI output using a regular expression with named groups
-8. Design and raise a custom exception class so a multi device script can report a connection failure without crashing
+1 Explain how Docker and Containerlab work together to build and run a multi-vendor virtual network.
+2. Manually bring up Layer 3 reachability across a mixed Arista and Nokia topology using each vendor's own CLI.
+3. Use Netmiko, inside the course's shared Python environment, to connect to a device over SSH and parse its CLI output with a regular expression.
+4. Handle a device connection failure gracefully using a custom exception class instead of letting a script crash.
+
 
 # Lab Environment and Preparation
 
