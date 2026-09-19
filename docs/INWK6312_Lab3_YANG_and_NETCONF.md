@@ -26,7 +26,7 @@ header-includes: |
   \renewcommand{\headrulewidth}{0.5pt}
 
   \lfoot{v1.0}
-  \cfoot{\copyright\ 2026 INWK6312}
+  \cfoot{\tiny \copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
 
@@ -56,7 +56,7 @@ You will need:
 
 - Your assigned Ubuntu VM IP address provided in Brightspace: ________________.
 - Your network topology, redeployed from its saved state in Task 0, with nodes carrying their interface configuration
-- Your GitHub Classroom repository
+- Your "Classroom 50" repository
 - pyang already installed on your VM
 - The lab's tools repository, https://github.com/martimy/Automation-Labs
 
@@ -79,8 +79,8 @@ Objective: Copy and start the topology created in Lab2, set up this lab's folder
 1. If you forgot to destroy the topology in Lab 2, do this now, otherwise skip this step.
 
     ```bash
-    sudo containerlab save -t ~/labs/lab2/topology/lab-net.clab.yml
-    sudo containerlab destroy -t ~/labs/lab2/topology/lab-net.clab.yml
+    containerlab save -t ~/labs/lab2/topology/lab-net.clab.yml
+    containerlab destroy -t ~/labs/lab2/topology/lab-net.clab.yml
     ```
 
 2. Copy the Containerlab topology and the auto-generated folder to `~/labs/topology`.
@@ -93,7 +93,7 @@ Objective: Copy and start the topology created in Lab2, set up this lab's folder
 3. Deploy the topology from the new location. You should also confirm that the nodes still retain their configuration.
 
     ```bash
-    sudo containerlab deploy -t ~/labs/topology/lab-net.clab.yml
+    containerlab deploy -t ~/labs/topology/lab-net.clab.yml
     ```    
 
 4. Clone the tools repository outside this lab's repository to keep them separate. These tools will be used in this and future labs.
@@ -531,8 +531,8 @@ Objective: bring this lab's files into your existing repository, excluding the d
 Save the running configuration on every node, then destroy the topology.
 
 ```bash
-sudo containerlab save -t ~/labs/topology/lab-net.clab.yml
-sudo containerlab destroy -t ~/labs/topology/lab-net.clab.yml
+containerlab save -t ~/labs/topology/lab-net.clab.yml
+containerlab destroy -t ~/labs/topology/lab-net.clab.yml
 ```
 
 Deactivate your virtual environment when you're done.

@@ -26,7 +26,7 @@ header-includes: |
   \renewcommand{\headrulewidth}{0.5pt}
 
   \lfoot{v1.0}
-  \cfoot{\copyright\ 2026 INWK6312}
+  \cfoot{\tiny \copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
 
@@ -56,7 +56,7 @@ You will need:
 
 - Your assigned Ubuntu VM IP address provided in Brightspace: ________________.
 - Your containerlab topology, redeployed from its saved state.
-- Your GitHub Classroom repository.
+- Your "Classroom 50" repository.
 
 gNMI runs on TCP port 57400 on `srl1` and 6030 on `ceos1` and `ceos2`, both enabled by default. Ansible is not installed on your VM yet.
 
@@ -85,13 +85,13 @@ Objective: bring the network topology back up, create the lab folder structure, 
 1. Check if the network topology is still active (it shouldn't be).
 
     ```bash
-    sudo containerlab inspect -t ~/labs/topology/lab-net.clab.yml
+    containerlab inspect -t ~/labs/topology/lab-net.clab.yml
     ```
 
 2. Redeploy the network topology from its saved state.
 
     ```bash
-    sudo containerlab deploy -t ~/labs/topology/lab-net.clab.yml
+    containerlab deploy -t ~/labs/topology/lab-net.clab.yml
     ```
 
 3. Check if interface addressing is present. If not, reconfigure the devices using the Appendix below. A faster way to check is to ping.
@@ -799,8 +799,8 @@ Objective: bring this lab's files into your existing repository.
 Save the running configuration on every node, then destroy the topology. The saved state needs the generated lab directory to still exist for the next lab's redeploy.
 
 ```bash
-sudo containerlab save -t ~/labs/topology/lab-net.clab.yml
-sudo containerlab destroy -t ~/labs/topology/lab-net.clab.yml
+containerlab save -t ~/labs/topology/lab-net.clab.yml
+containerlab destroy -t ~/labs/topology/lab-net.clab.yml
 ```
 
 If you want to confirm the save actually captured OSPF before destroying anything, `ceos1`'s and `srl1`'s saved startup configs are readable directly:

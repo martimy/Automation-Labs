@@ -26,7 +26,7 @@ header-includes: |
   \renewcommand{\headrulewidth}{0.5pt}
 
   \lfoot{v1.0}
-  \cfoot{\copyright\ 2026 INWK6312}
+  \cfoot{\tiny \copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
 
@@ -56,7 +56,7 @@ By the end of this lab, you will be able to:
 You will need:
 
 - Your network topology
-- Your GitHub Classroom repository
+- Your "Classroom 50" repository
 - Docker and Docker Compose, already available on your VM
 
 
@@ -394,7 +394,7 @@ Objective: extend the network topology file by adding two hosts that connect to 
 2. Deploy the topology.
 
     ```bash
-    sudo containerlab deploy -t ~/labs/topology/lab-net.clab.yml
+    containerlab deploy -t ~/labs/topology/lab-net.clab.yml
     ```
 
 3. The nodes should retain their past configuration, but if the configuration doesn't come back automatically, then you can apply the configuration list in the Appendix below.
@@ -963,8 +963,8 @@ Objective: bring the rest of this lab's files into your repository.
 Save the network's configuration, then destroy it.
 
 ```bash
-sudo containerlab save -t ~/labs/topology/lab-net.clab.yml
-sudo containerlab destroy -t ~/labs/topology/lab-net.clab.yml
+containerlab save -t ~/labs/topology/lab-net.clab.yml
+containerlab destroy -t ~/labs/topology/lab-net.clab.yml
 ```
 
 NetBox and Batfish are not part of the saved topology state, stop them separately if you want to reclaim the resources.
