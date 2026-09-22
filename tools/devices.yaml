@@ -27,16 +27,16 @@ devices:
       username: admin
       password: admin
       insecure: true
-  ceos1:
+  ceos2:
     netconf:
-      host: ceos1
+      host: ceos2
       port: 830
       username: admin
       password: admin
       hostkey_verify: false
     gnmi:
       target:
-        - ceos1
+        - ceos2
         - 6030
       username: admin
       password: admin
