@@ -25,8 +25,8 @@ header-includes: |
   \lhead{\title}
   \renewcommand{\headrulewidth}{0.5pt}
 
-  \lfoot{v1.0}
-  \cfoot{\copyright\ 2026 INWK6312}
+  \lfoot{v1.0.1}
+  \cfoot{\tiny \copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
 
@@ -40,19 +40,16 @@ header-includes: |
 
 # Introduction
 
-This lab introduces the fundamental Linux and version control skills required for the remainder of the course. You will work directly on an Ubuntu virtual machine to build a routed network using Linux namespaces, which serves as a manual precursor to the containerized emulation used in later modules. Instead of treating this as a standalone exercise, you will establish a professional repository structure that will house all your work, shared tools, and network topologies for Labs 2 through 5.
+This lab introduces fundamental Linux and version control skills. You will also build a small routed network using Linux namespaces. Additionally, you will set up the repository structure that houses your work, shared tools, and network topologies for the subsequent labs.
 
 # Lab Objectives
 
 By the end of this lab, you will be able to:
 
-1. Navigate the Linux filesystem and establish a multi-module project hierarchy.
-2. Manage file ownership and permissions for automation scripts.
-3. Use text processing tools like `grep` and `sed` to manipulate configuration data.
-4. Manage `systemd` services through their full lifecycle.
-5. Configure isolated network environments using namespaces, veth pairs, and static routing.
-6. Initialize a centralized Python virtual environment and a global Git repository.
-7. Implement a professional Git workflow including branching, merge conflict resolution, and pull requests.
+1. Work confidently in a Linux shell, navigating the filesystem, managing file permissions, and controlling systemd services, well enough to support automation work in later labs.
+2. Build and troubleshoot a simple routed network using Linux namespaces, veth pairs, and static routing.
+3. Set up the shared Python virtual environment and Git repository used throughout the course.
+4. Use a professional Git workflow, branching, merge conflict resolution, and pull requests, to manage change safely.
 
 # Lab Environment and Preparation
 
@@ -60,7 +57,7 @@ You will need:
 
 - Your assigned Ubuntu VM IP address provided in Brightspace: ________________.
 - A GitHub account.
-- The GitHub Classroom assignment link, provided by an email from the instructor.
+- The "Classroom 50" assignment link, provided by an email from the instructor.
 
 If any of the components above are missing, check with your lab instructor before starting the lab.
 
@@ -326,14 +323,11 @@ Objective: build two fully isolated network stacks on the same VM and connect th
 
 2. Create a veth pair to act as your virtual wire. Name the ends `veth-red` and `veth-blue`.
 
-
     ```bash
     sudo ip link add veth-red type veth peer name veth-blue
     ```
 
-
 3. Move each end of the wire into its respective namespace.
-
 
     ```bash
     sudo ip link set veth-red netns ns-red
@@ -404,9 +398,9 @@ Target topology: `ns-hostA (10.10.1.2/24) -- ns-router -- ns-hostB (10.10.2.2/24
 3. Create the second `veth` pair between `ns-router` and `ns-hostB`. Name the ends `veth-r2` and `veth-b`.
 
     ```bash
-    sudo ip link add veth-r2 type veth peer name veth-b
-    sudo ip link set veth-r2 netns ns-router
+    sudo ip link add veth-b type veth peer name veth-r2
     sudo ip link set veth-b netns ns-hostB
+    sudo ip link set veth-r2 netns ns-router
     ```
 
 4. Move the interfaces into their respective namespaces and verify the placement. `ns-hostA` should contain `veth-a`, `ns-router` should contain both `veth-r1` and `veth-r2`, and `ns-hostB` should contain `veth-b`.
@@ -461,7 +455,6 @@ Target topology: `ns-hostA (10.10.1.2/24) -- ns-router -- ns-hostB (10.10.2.2/24
     ```
 
 9. Test end to end connectivity by pinging from `ns-hostA` to `ns-hostB`.
-
 
     ```bash
     sudo ip netns exec ns-hostA ping -c 3 10.10.2.2
@@ -570,11 +563,13 @@ Objective: turn the manual steps from Task 6 into repeatable scripts to avoid ma
 Objective: establish the root of your project as a Git repository and set up a unified Python environment that will serve the entire course.
 
 1. Move into your root `~/labs` directory. This directory will be the root of your Git repository and your Python environment.
+
     ```bash
     cd ~/labs
     ```
 
 2. Initialize the repository and set the main branch name.
+
     ```bash
     git init
     git branch -m main
@@ -649,6 +644,7 @@ Objective: bring your Part A work under version control and practice the basic G
     ```
 
 5. Review your commit history using `git log`.
+
     ```bash
     git log
     git log --oneline
@@ -682,6 +678,7 @@ Objective: isolate infrastructure changes on a feature branch before merging the
     ```
 
 5. Switch back to the `main` branch
+
     ```bash
     git switch main
     ```
@@ -707,7 +704,8 @@ Objective: isolate infrastructure changes on a feature branch before merging the
 
 Objective: resolve a conflict manually when two different branches modify the same configuration lines in the same file.
 
-1. Ensure you are on the `main` branch, then create a branch named `experiment-a`: 
+1. Ensure you are on the `main` branch, then create a branch named `experiment-a`:
+
     ```bash
     git switch main
     git switch -c experiment-a
@@ -775,10 +773,10 @@ Objective: resolve a conflict manually when two different branches modify the sa
 
 ## Task 12: Publishing to GitHub and Opening a Pull Request
 
-Objective: connect your local repository to GitHub Classroom and complete a peer review cycle using a pull request.
+Objective: connect your local repository to Classroom 50 and complete a peer review cycle using a pull request.
 
-1. Open the GitHub Classroom assignment link provided by your instructor and accept it to generate your personal remote repository.
-2. Generate a personal access token on GitHub with `repo` scope. Use this token as your password when prompted during the push process.
+1. Open the "Classroom 50" assignment link provided by your instructor and accept it to generate your personal remote repository.
+2. Generate a personal access token on GitHub following the steps in the "GitHub Access Token Setup" document. Use this token as your password when prompted during the push process.
 
 3. Link your local `~/labs` repository to the new remote.
 
@@ -795,13 +793,11 @@ Objective: connect your local repository to GitHub Classroom and complete a peer
 
 5. Create a new branch named `docs/readme` for project documentation.
 
-
     ```bash
     git switch -c docs/readme
     ```
 
 6. Create a `~/labs/README.md` file at the root. Describe the contents of the `lab1`, directories, and explain how to run the topology scripts.
-
 
     ```bash
     nano README.md
@@ -867,7 +863,7 @@ Part B: Git and Environment Management
 
 You could leave the `inwk-demo` systemd service running as it is a harmless background process. You may leave your namespace topology active or use your `teardown-topology.sh` script to remove it, as the scripts allow you to rebuild the infrastructure at any time.
 
-> Do NOT delete the `.velab` directory or your `.gitignore` file, as these are central to the unified environment you will use for the rest of the course. Do NOT delete your GitHub Classroom repository, as you will continue to extend this same repository in Lab 2 and beyond.
+> Do NOT delete the `.velab` directory or your `.gitignore` file, as these are central to the unified environment you will use for the rest of the course. Do NOT delete your "Classroom 50" repository, as you will continue to extend this same repository in Lab 2 and beyond.
 
 # Submission
 
@@ -878,7 +874,7 @@ Before submitting, verify that your repository history includes the following de
 3. The `feature/add-hostC` merge.
 4. The resolved merge conflict from Task 11, visible as a merge commit in the git graph.
 5. The `REFLECTION.md` file in the `lab1` folder.
-6. The `docs/readme` pull request, merged and visible on your GitHub Classroom repository.
+6. The `docs/readme` pull request, merged and visible on your "Classroom 50" repository.
 
 Submit the link to your GitHub repository as instructed by your course platform.
 

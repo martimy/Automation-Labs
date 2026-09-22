@@ -24,7 +24,7 @@ header-includes: |
   \renewcommand{\headrulewidth}{0.5pt}
 
   \lfoot{v1.0}
-  \cfoot{\copyright\ 2026 INWK6312}
+  \cfoot{\tiny \copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
 
@@ -40,10 +40,21 @@ This is a living document. If you hit a problem that is not covered here, tell y
 
 # Before You Start Any Lab, Five Habits Worth Building
 
-1. Chain a `cd` with whatever comes after it, using `&&`, whenever the next command depends on being in the right place. `cd ~/labs/lab3 && nano script.py` fails loudly if the `cd` fails. `cd ~/labs/lab3` on its own line followed by `nano script.py` on the next line will happily create `script.py` in the wrong folder if the `cd` silently failed, and you may not notice until a later step.
-2. Check a file before you run it. For YAML: `python3 -c "import yaml; yaml.safe_load(open('file.yml'))"`. For Python: `python3 -m py_compile script.py`. For a shell script: `bash -n script.sh`. For an Ansible playbook: `ansible-playbook -i inventory.yml playbook.yml --syntax-check`. All four take a few seconds and turn an invisible whitespace or syntax mistake into a specific, readable error message instead of a confusing failure two commands later.
+1. Chain a `cd` with whatever comes after it, using `&&`, whenever the next command depends on being in the right place.  
+  `cd ~/labs/lab3 && nano script.py` fails if the `cd` fails. `cd ~/labs/lab3` on its own line followed by `nano script.py` on the next line will happily create `script.py` in the wrong folder if the `cd` silently failed, and you may not notice until a later step.
+
+2. Check a file before you run it.
+    - For YAML: `python3 -c "import yaml; yaml.safe_load(open('file.yml'))"`.
+    - For Python: `python3 -m py_compile script.py`.
+    - For a shell script: `bash -n script.sh`. 
+    - For an Ansible playbook: `ansible-playbook -i inventory.yml playbook.yml --syntax-check`.
+     
+    All four take a few seconds and turn an invisible whitespace or syntax mistake into a specific, readable error message instead of a confusing failure two commands later.
+
 3. Tag the end of every lab: `git tag labN-complete`. This is your personal undo button. If a later lab goes badly wrong, `git reset --hard labN-complete` returns your repository to exactly that known-good state, no one else needs to be involved.
+
 4. Read error messages before retyping the command. Most of what looks like a mysterious failure is a specific, plain-English sentence telling you exactly what went wrong, permission denied, file not found, already exists. The Quick Reference table at the end of this guide maps the most common ones to their fix.
+
 5. Know the difference between a mess you can fix yourself and damage to the VM itself. Almost everything in these labs falls into the first category. If you are ever unsure which one you are looking at, stop and ask rather than trying increasingly drastic commands to fix it.
 
 # Mistakes That Are Easy to Make, and How to Avoid Them

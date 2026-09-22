@@ -26,7 +26,7 @@ header-includes: |
   \renewcommand{\headrulewidth}{0.5pt}
 
   \lfoot{v1.0}
-  \cfoot{\copyright\ 2026 INWK6312}
+  \cfoot{\tiny \copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
 
@@ -39,20 +39,17 @@ header-includes: |
 
 # Introduction
 
-This lab covers Docker then use Containerlab to deploy a small mixed vendor topology, two Arista cEOS nodes and one Nokia SR Linux node, connected in a ring. You will bring up Layer 3 reachability on that topology by hand, using each vendor's own CLI. In the second part of the lab, you will build an isolated Python environment and use Netmiko to talk to the Arista nodes over SSH instead of typing commands yourself, parse the CLI output you get back, and handle a connection failure with a custom exception instead of letting the script crash.
+This lab covers Docker, then uses Containerlab to deploy a small mixed vendor topology, two Arista cEOS nodes and one Nokia SR Linux node, connected in a ring. You will configure Layer 3 connectivity manually using each vendor's own CLI. In the second part of the lab, you will build an isolated Python environment and use Netmiko to talk to the Arista nodes over SSH, parse the CLI output you get back, and handle a connection failure with a custom exception.
 
 # Lab Objectives
 
 By the end of this lab, you will be able to:
 
-1. Inspect Docker images and containers to explain the difference between an image and a running container
-2. Explain the components of a Containerlab topology definition file, including kinds, nodes, images, and links
-3. Deploy a multi vendor topology combining Arista cEOS and Nokia SR Linux nodes
-4. Manually configure Layer 3 interfaces on both Arista EOS and Nokia SR Linux, and confirm reachability across a fully meshed topology
-5. Utilize the centralized Python virtual environment established in Lab 1 to manage project dependencies
-6. Use Netmiko to connect to a network device over SSH and retrieve CLI output
-7. Parse unstructured CLI output using a regular expression with named groups
-8. Design and raise a custom exception class so a multi device script can report a connection failure without crashing
+1 Explain how Docker and Containerlab work together to build and run a multi-vendor virtual network.
+2. Manually bring up Layer 3 reachability across a mixed Arista and Nokia topology using each vendor's own CLI.
+3. Use Netmiko, inside the course's shared Python environment, to connect to a device over SSH and parse its CLI output with a regular expression.
+4. Handle a device connection failure gracefully using a custom exception class instead of letting a script crash.
+
 
 # Lab Environment and Preparation
 
@@ -61,7 +58,7 @@ You will need:
 - Your assigned Ubuntu VM IP address provided in Brightspace: ________________.
 - Docker, Containerlab, and Python 3 with the venv module preinstalled.
 - The `ceos:v4.36` and `ghcr.io/nokia/srlinux:26.7.1-554-amd64` images already pulled and available locally.
-- Your GitHub Classroom repository
+- Your "Classroom 50" repository
 
 If any of the components above are missing, check with your lab instructor before starting the lab.
 
@@ -161,13 +158,13 @@ Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy
 4. Deploy it.
 
     ```bash
-    sudo containerlab deploy -t test-ceos.clab.yml
+    containerlab deploy -t test-ceos.clab.yml
     ```
 
 5. Verify it came up and note its management IP address.
 
     ```bash
-    sudo containerlab inspect -t test-ceos.clab.yml
+    containerlab inspect -t test-ceos.clab.yml
     ```
 
 6. Connect directly to its CLI. Containerlab names the underlying container `clab-<lab-name>-<node-name>`, so this node is `clab-test-ceos-ceos1`.
@@ -193,7 +190,7 @@ Objective: deploy a single cEOS node on its own, connect to its CLI, and destroy
 8. Destroy the lab, you are done with this topology.
 
     ```bash
-    sudo containerlab destroy -t test-ceos.clab.yml --cleanup
+    containerlab destroy -t test-ceos.clab.yml --cleanup
     ```
 
 >The local `--cleanup` flag instructs containerlab to remove the auto-generated lab directory `clab-<lab-name>` and all its content. This prevents Containerlab from reusing previous startup configuration artifacts on the next deploy. In this case, you will not need any saved information.
@@ -228,8 +225,8 @@ Objective: deploy a single SR Linux node on its own, and get a first look at how
 
     ```bash
     python3 -c "import yaml; yaml.safe_load(open('test-srl.clab.yml'))"
-    sudo containerlab deploy -t test-srl.clab.yml
-    sudo containerlab inspect -t test-srl.clab.yml
+    containerlab deploy -t test-srl.clab.yml
+    containerlab inspect -t test-srl.clab.yml
     ```
 
 3. Connect to the SR Linux CLI. Note the command is `sr_cli`, not `Cli`. Type `quit` and `ENTER` to exit.
@@ -255,7 +252,7 @@ Objective: deploy a single SR Linux node on its own, and get a first look at how
 5. Destroy the lab.
 
     ```bash
-    sudo containerlab destroy -t test-srl.clab.yml --cleanup
+    containerlab destroy -t test-srl.clab.yml --cleanup
     ```
 
 ### Questions and Deliverables
@@ -301,13 +298,13 @@ Three nodes connected in a ring means every node has a direct link to both of th
 
     ```bash
     python3 -c "import yaml; yaml.safe_load(open('lab-net.clab.yml'))"
-    sudo containerlab deploy -t lab-net.clab.yml
+    containerlab deploy -t lab-net.clab.yml
     ```
 
 3. Verify all three nodes are running.
 
     ```bash
-    sudo containerlab inspect -t lab-net.clab.yml
+    containerlab inspect -t lab-net.clab.yml
     ```
 
 4. Confirm Containerlab also registered each node's hostname on your VM. Because the topology file sets prefix to an empty string, the hostname it registers is the plain node name, not a clab prefixed version of it.
@@ -709,7 +706,7 @@ Objective: Stage your changes using the global Git configuration established in 
 You can destroy the lab now, but before that, you will need to save the device configurations to be reused in future labs. Typically, you would do that in each device individually using commands such as `write memory`, but containerlab offers a convenient way to to perform configuration save for all containers running in the lab.
 
 ```bash
-sudo containerlab save -t ~/labs/lab2/topology/lab-net.clab.yml
+containerlab save -t ~/labs/lab2/topology/lab-net.clab.yml
 ```
 
 The `save` command will save the configuration files under the directory `lab2/topology/clab-lab-net`, which is not tracked by git.
@@ -719,7 +716,7 @@ Destroy the topology.
 >Do NOT add `--cleanup` flag to the `destroy` command, you need configuration to persist for future labs.
 
 ```bash
-sudo containerlab destroy -t ~/labs/lab2/topology/lab-net.clab.yml
+containerlab destroy -t ~/labs/lab2/topology/lab-net.clab.yml
 ```
 
 Destroying and later redeploying this topology will bring the containers back and restore the topology with the saved configurations.
@@ -753,11 +750,11 @@ Confirm your repository includes, at minimum, the following, then submit as inst
 | docker images | List Docker images available on the host |
 | docker system df | Show Docker disk usage and storage summary |
 | containerlab version | Confirm the installed Containerlab version |
-| sudo containerlab deploy -t \<topology file\> | Deploy the multi vendor topology |
+| containerlab deploy -t \<topology file\> | Deploy the multi vendor topology |
 | containerlab inspect -t \<topology file\> | View the status and management IP addresses of nodes |
-| sudo containerlab graph -t \<topology file\> | Generate a visual graph of the topology |
-| sudo containerlab save -t \<topology file\> | Save the running configuration of all nodes |
-| sudo containerlab destroy -t \<topology file\> | Stop the lab and remove containers |
+| containerlab graph -t \<topology file\> | Generate a visual graph of the topology |
+| containerlab save -t \<topology file\> | Save the running configuration of all nodes |
+| containerlab destroy -t \<topology file\> | Stop the lab and remove containers |
 | ssh admin@ceos1 | Connect to a node CLI via SSH |
 
 ## Arista EOS CLI Essentials

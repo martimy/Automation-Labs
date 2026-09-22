@@ -26,7 +26,7 @@ header-includes: |
   \renewcommand{\headrulewidth}{0.5pt}
 
   \lfoot{v1.0}
-  \cfoot{\copyright\ 2026 INWK6312}
+  \cfoot{\tiny \copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
 
@@ -39,25 +39,16 @@ header-includes: |
 
 # Introduction
 
-This configures OSPF routing across the whole network using gNMI for Nokia SR Linux node and Ansible for Arista cEOS nodes. In the first part of the lab, you will use gNMI to discover what SR Linux supports, pulling a plain snapshot with Get, writing your own script to receive a live Subscribe stream, then configuring OSPF through the CLI to add a loopback interface with a script of your own using gNMI Set. In the second part, you will install Ansible and use it to push configuration to the cEOS nodes, an interface description first, then OSPF.
-
-This lab starts by redeploying the network topology from previous labs. If the nodes' configuration doesn't come back with it, redeploy and reconfigure using Lab 2 Tasks 3 and 4 before continuing.
+This lab configures OSPF routing across the whole network, using gNMI for the Nokia SR Linux node and Ansible for the Arista cEOS nodes. In the first part, you will use gNMI to discover the YANG modules that SR Linux supports, pull a snapshot with Get, write a script to receive a live Subscribe stream, then use gNMI Set to add a loopback interface into the running configuration. In the second part, you will install Ansible and use it to push configuration to the cEOS nodes, an interface description first, then OSPF.
 
 # Lab Objectives
 
 By the end of this lab, you will be able to:
 
-1. Discover a device's gNMI capabilities and supported models, and retrieve a configuration snapshot with a plain Get
-2. Write a Python script using `pygnmi` to receive a live gNMI Subscribe stream
-3. Compare SAMPLE and ON_CHANGE telemetry modes by observing their actual behavior against a live device
-4. Read back a live device's configuration over gNMI and identify which YANG module actually owns it
-5. Use gNMI Set to add a single new piece to an already running configuration without disturbing what's already there
-6. Build an Ansible inventory with the connection variables a real network device needs
-7. Use Ansible to gather facts, register output, and display it with debug
-8. Render a Jinja2 template and push it to a device with a config module
-9. Demonstrate idempotency and check mode, and explain what each one actually proves
-10. Write and deliberately break an Ansible compliance check using assert
-11. Push a multi-line routing protocol configuration with Ansible across two devices and confirm, with a ping, that it changed what the network can actually reach
+1. Discover a device's gNMI capabilities and models, and retrieve configuration and state with a plain Get.
+2. Write and compare Python scripts that receive live telemetry over gNMI Subscribe, in both SAMPLE and ON_CHANGE modes.
+3. Use gNMI Set to make a configuration change, and confirm it by reading back.
+4. Build an Ansible inventory and use playbooks to push configuration to network devices idempotently.
 
 # Lab Environment and Preparation
 
@@ -65,7 +56,7 @@ You will need:
 
 - Your assigned Ubuntu VM IP address provided in Brightspace: ________________.
 - Your containerlab topology, redeployed from its saved state.
-- Your GitHub Classroom repository.
+- Your "Classroom 50" repository.
 
 gNMI runs on TCP port 57400 on `srl1` and 6030 on `ceos1` and `ceos2`, both enabled by default. Ansible is not installed on your VM yet.
 
@@ -94,13 +85,13 @@ Objective: bring the network topology back up, create the lab folder structure, 
 1. Check if the network topology is still active (it shouldn't be).
 
     ```bash
-    sudo containerlab inspect -t ~/labs/topology/lab-net.clab.yml
+    containerlab inspect -t ~/labs/topology/lab-net.clab.yml
     ```
 
 2. Redeploy the network topology from its saved state.
 
     ```bash
-    sudo containerlab deploy -t ~/labs/topology/lab-net.clab.yml
+    containerlab deploy -t ~/labs/topology/lab-net.clab.yml
     ```
 
 3. Check if interface addressing is present. If not, reconfigure the devices using the Appendix below. A faster way to check is to ping.
@@ -757,17 +748,11 @@ Objective: push a routing configuration and confirm with a ping that it actually
 7. Prove it with two traceroute, from `ceos1` and `ceos2` to a remote subnet.
 
     ```bash
-    docker exec -it ceos1 Cli -c "traceroute 10.0.23.2"
-    docker exec -it ceos2 Cli -c "traceroute 10.0.13.1"
+    ansible -i inventory.yml ceos1 -m arista.eos.eos_command -a "commands='traceroute 10.0.23.2'"
+    ansible -i inventory.yml ceos2 -m arista.eos.eos_command -a "commands='traceroute 10.0.13.1'"
     ```
 
     Both should succeed by going through a transit subnet.
-
-    Note: You can use Ansible ad hoc command in this step. Remember to specify which node you want to use, otherwise the command will be execute in all nodes in the inventory.
-
-    ```bash
-    ansible -i inventory.yml ceos1 -m arista.eos.eos_command -a "commands='traceroute 10.0.23.2'"  
-    ```
 
 ### Questions and Deliverables
 
@@ -814,8 +799,8 @@ Objective: bring this lab's files into your existing repository.
 Save the running configuration on every node, then destroy the topology. The saved state needs the generated lab directory to still exist for the next lab's redeploy.
 
 ```bash
-sudo containerlab save -t ~/labs/topology/lab-net.clab.yml
-sudo containerlab destroy -t ~/labs/topology/lab-net.clab.yml
+containerlab save -t ~/labs/topology/lab-net.clab.yml
+containerlab destroy -t ~/labs/topology/lab-net.clab.yml
 ```
 
 If you want to confirm the save actually captured OSPF before destroying anything, `ceos1`'s and `srl1`'s saved startup configs are readable directly:

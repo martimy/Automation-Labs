@@ -26,7 +26,7 @@ header-includes: |
   \renewcommand{\headrulewidth}{0.5pt}
 
   \lfoot{v1.0}
-  \cfoot{\copyright\ 2026 INWK6312}
+  \cfoot{\tiny \copyright\ 2026 INWK6312}
   \rfoot{Page \thepage\ of \pageref{LastPage}}
   \renewcommand{\headrulewidth}{0.5pt}
 
@@ -39,19 +39,16 @@ header-includes: |
 
 # Introduction
 
-The first part of this lab covers working with data formats and YANG outside of any live device, and using pyang tool to catch errors in a YANG module before using it in real hardware. The second part covers using NETCONF tools to discover what a network device supports, read write a configuration payload.
+The first part of this lab works with data formats and YANG, using the pyang tool to catch errors in a YANG module before it is deployed to active device. In the second part, you will use NETCONF to discover a device's capabilities and supported YANG modules, then read and write configuration payload.
 
 # Lab Objectives
 
 By the end of this lab, you will be able to:
 
-1. Convert a small dataset between JSON and YAML using Python's json and yaml libraries
-2. Read an RFC 8340 YANG tree diagram and identify configuration versus operational state nodes
-3. Use pyang to catch structural and syntax errors in a YANG module before trusting it against a real device
-4. Verify NETCONF reachability on a network device before scripting against it
-5. Discover a device's supported NETCONF capabilities and YANG modules, and pull a YANG schema directly off a live device
-6. Read a real NETCONF configuration payload and connect it back to the module that defines it, including vendor augmentation
-7. Write a Python script using ncclient to edit and commit a configuration change through a device's candidate datastore
+1. Work with structured data, JSON, YAML, and YANG, well enough to read a module's tree diagram and validate it with pyang.
+2. Verify NETCONF reachability and discover what a device can support.
+3. Read a real NETCONF configuration payload and connect it back to the YANG module that defines it, including vendor augmentation.
+4. Write a Python script with ncclient to edit and commit a configuration change through a device's candidate datastore.
 
 # Lab Environment and Preparation
 
@@ -59,7 +56,7 @@ You will need:
 
 - Your assigned Ubuntu VM IP address provided in Brightspace: ________________.
 - Your network topology, redeployed from its saved state in Task 0, with nodes carrying their interface configuration
-- Your GitHub Classroom repository
+- Your "Classroom 50" repository
 - pyang already installed on your VM
 - The lab's tools repository, https://github.com/martimy/Automation-Labs
 
@@ -82,8 +79,8 @@ Objective: Copy and start the topology created in Lab2, set up this lab's folder
 1. If you forgot to destroy the topology in Lab 2, do this now, otherwise skip this step.
 
     ```bash
-    sudo containerlab save -t ~/labs/lab2/topology/lab-net.clab.yml
-    sudo containerlab destroy -t ~/labs/lab2/topology/lab-net.clab.yml
+    containerlab save -t ~/labs/lab2/topology/lab-net.clab.yml
+    containerlab destroy -t ~/labs/lab2/topology/lab-net.clab.yml
     ```
 
 2. Copy the Containerlab topology and the auto-generated folder to `~/labs/topology`.
@@ -96,7 +93,7 @@ Objective: Copy and start the topology created in Lab2, set up this lab's folder
 3. Deploy the topology from the new location. You should also confirm that the nodes still retain their configuration.
 
     ```bash
-    sudo containerlab deploy -t ~/labs/topology/lab-net.clab.yml
+    containerlab deploy -t ~/labs/topology/lab-net.clab.yml
     ```    
 
 4. Clone the tools repository outside this lab's repository to keep them separate. These tools will be used in this and future labs.
@@ -534,8 +531,8 @@ Objective: bring this lab's files into your existing repository, excluding the d
 Save the running configuration on every node, then destroy the topology.
 
 ```bash
-sudo containerlab save -t ~/labs/topology/lab-net.clab.yml
-sudo containerlab destroy -t ~/labs/topology/lab-net.clab.yml
+containerlab save -t ~/labs/topology/lab-net.clab.yml
+containerlab destroy -t ~/labs/topology/lab-net.clab.yml
 ```
 
 Deactivate your virtual environment when you're done.

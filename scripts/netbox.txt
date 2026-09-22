@@ -1,0 +1,16 @@
+environment:
+  SUPERUSER_PASSWORD: ${NETBOX_ADMIN_PASS}
+  SUPERUSER_API_TOKEN: ${NETBOX_API_TOKEN}
+  
+  
+curl -X GET \
+  -H "Authorization: Bearer nbt_7MbPVtCG6s4M.71baa11acddb35b0486f5c9430cd0a3f3bba3162" \
+  -H "Accept: application/json; indent=4" \
+  http://localhost:8000/api/dcim/sites/
+  
+  
+  Bearer nbt_7MbPVtCG6s4V.SYqKT1DaOb8xgppXOoCkszKrXBbvArPiJ0oIN0SD
+  
+  
+  71baa11acddb35b0486f5c9430cd0a3f3bba3162
+  
